@@ -50,8 +50,7 @@ function init(dbInstance) {
   };
 }
 
-module.exports = {
-  init,
-  get storage() { return storage; },
-  get db() { return db; },
-};
+function getStorage() { return storage; }
+function getDb() { return db; }
+
+module.exports = { init, getStorage, getDb };

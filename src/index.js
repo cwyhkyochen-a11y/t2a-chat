@@ -7,6 +7,7 @@ const { readBody, jsonRes } = require('./utils');
 const dbChat = require('./db-chat');
 const dbChatLLM = require('./db-chat-llm');
 const dbConfig = require('./db-config');
+const storageModule = require('./storage');
 
 function checkAdminAuth(req, adminAuth) {
   if (!adminAuth) return false;
@@ -28,6 +29,7 @@ function createChatApp(options) {
   dbChat.init(db);
   dbChatLLM.init(db);
   dbConfig.init(db);
+  storageModule.init(db);
 
   // 初始化 schema（如果表不存在）
   const fs = require('fs');
