@@ -1,0 +1,16 @@
+{
+  "name": "t2a-chat",
+  "version": "0.1.0",
+  "description": "应用层 Chat 服务 - 基于 @t2a/core 的完整对话系统，可嵌入任何业务后台",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@t2a/core": "^0.6.1",
+    "better-sqlite3": "^11.0.0",
+    "ws": "^8.16.0"
+  },
+  "engines": { "node": ">=18" }
+}

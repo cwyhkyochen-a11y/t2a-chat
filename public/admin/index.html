@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>t2a-chat Admin</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="header-title">t2a-chat Admin</h1>
+    <nav class="tabs">
+      <button class="tab active" data-tab="config">配置管理</button>
+      <button class="tab" data-tab="tools">工具列表</button>
+      <button class="tab" data-tab="sessions">会话管理</button>
+      <button class="tab" data-tab="providers">LLM Provider</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section id="tab-config" class="tab-content active"></section>
+    <section id="tab-tools" class="tab-content"></section>
+    <section id="tab-sessions" class="tab-content"></section>
+    <section id="tab-providers" class="tab-content"></section>
+  </main>
+
+  <!-- Modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button class="btn-ghost" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

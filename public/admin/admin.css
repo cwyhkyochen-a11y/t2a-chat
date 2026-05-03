@@ -1,0 +1,154 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #fafafa;
+  color: #1a1a1a;
+  line-height: 1.6;
+}
+
+.header {
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 16px 24px 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.tab:hover { color: #1a1a1a; }
+.tab.active { color: #1a1a1a; border-bottom-color: #2563eb; font-weight: 500; }
+
+.container {
+  max-width: 960px;
+  margin: 24px auto;
+  padding: 0 24px;
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Cards */
+.card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+/* Forms */
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.form-group textarea { min-height: 100px; resize: vertical; }
+
+/* Buttons */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-danger { background: #dc2626; color: #fff; }
+.btn-ghost { background: transparent; border: 1px solid #e5e5e5; color: #555; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e5e5; }
+th { font-weight: 500; color: #555; font-size: 13px; }
+tr:nth-child(even) { background: #fafafa; }
+tr:hover { background: #f0f4ff; }
+
+/* Divider */
+.divider { border: none; border-top: 1px solid #e5e5e5; margin: 24px 0; }
+
+/* Tool card */
+.tool-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.tool-desc { font-size: 14px; color: #555; margin-bottom: 8px; }
+.tool-schema { font-size: 12px; font-family: monospace; background: #f5f5f5; padding: 8px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; max-height: 200px; overflow-y: auto; display: none; }
+.tool-schema.open { display: block; }
+.toggle-schema { font-size: 12px; color: #2563eb; cursor: pointer; background: none; border: none; }
+
+/* Pagination */
+.pagination { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
+
+/* Modal */
+.modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.modal.hidden { display: none; }
+.modal-content {
+  background: #fff; border-radius: 8px; padding: 24px;
+  max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-header h3 { font-size: 16px; font-weight: 600; }
+
+/* Messages */
+.msg { padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
+.msg-user { background: #e8f0fe; }
+.msg-assistant { background: #f0f0f0; }
+.msg-system { background: #fff3cd; }
+.msg-role { font-weight: 600; font-size: 12px; text-transform: uppercase; margin-bottom: 2px; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .container { padding: 0 12px; }
+  .tabs { overflow-x: auto; }
+  table { font-size: 12px; }
+  th, td { padding: 6px 8px; }
+}
