@@ -298,6 +298,10 @@
   async function selectConversation(id) {
     const myEpoch = ++_selectEpoch;
     currentConvId = id;
+    // 立即更新选中态（不等 loadConversations fetch 回来）
+    document.querySelectorAll('.conv-item').forEach(function (el) {
+      el.classList.toggle('active', el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + id + "'") >= 0);
+    });
     loadConversations();
     // emit switching 事件，adapter 可以做清理 + 显示 loading
     if (window._t2aSlots) window._t2aSlots.emit('conversation:switching', { id: id });
