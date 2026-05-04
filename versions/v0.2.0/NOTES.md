@@ -146,3 +146,129 @@ ALL PASSED (24 checks)
 - 登录 overlay 视觉简化（PLAN 提到，本轮没做）
 - 配置面板的实际管理后台 UI（registerConfigPanel 注册 API 已 ready，admin 页面渲染留 P2）
 - imagine adapter 文件（T8 留给下一个 sub-agent 或 P2）
+
+---
+
+## P2 完成 — imagine 切换到 t2a-chat 通用前端 + adapter
+
+### 完成范围
+- T8: imagine adapter 文件
+- T9: imagine server.js 适配新 createChatApp 接口
+- T10: imagine 前端切换 + 本地验证
+- 修复 T6/T7 P1 遗留：t2a-chat 通用前端鉴权流程切换为 cookie-based
+
+### 关键改动
+
+#### 1. t2a-chat 通用前端：cookie-based auth（P2 修补）
+**问题**：P0 后端已切到 noServer + resolveWsUser 在 upgrade 阶段鉴权，但 P1 前端的 ws-manager 还在发 `{ type: 'auth', password }` 消息（被新后端忽略），且 chat-routes 调用还在带 `?user_password=...`（新 chat-routes 已改用 ctx.resolveUser）。前后端不一致。
+
+**修复**：
+- `public/core.js`：
+  - 新增 `T2A_CHAT_CONFIG` 全局配置（`apiBase`, `loginUrl`），宿主可覆盖
+  - `doLogin()` 改为先 POST `loginUrl`（宿主提供）→ 服务端 set cookie → 然后才连 WS
+  - 移除所有 `?user_password=...` query 参数
+  - 所有 fetch 改用 `credentials: 'include'`（cookie 自动带上）
+  - 新增 `_t2aSlots.emit` 事件：`tool:call`, `tool:end`, `tool:error`, `history:loaded`, `ready`，供 adapter 钩入
+  - logout 调 `/api/chat/logout` 清 cookie（宿主提供）
+  - WS 启动时即使无密码也尝试连接（如有 cookie 则成功）
+- `public/ws-manager.js`：
+  - `onclose`: 区分 4001（后端主动 fail）与 1006-before-authed（upgrade 401，新后端鉴权失败路径），都视为 auth 失败 → 显示登录浮层
+  - `onopen` 还会发 auth 消息但有 `if (this.password)` guard，对新后端无影响
+
+#### 2. imagine server.js（v0.2.0 新 API）
+- `auth: { resolveUser, resolveWsUser }`：从 cookie `imagine_pw` 取密码 → `db.verifyUser`
+- 新增 endpoint：`POST /api/chat/login` set cookie + 返回用户、`POST /api/chat/logout` 清 cookie
+- 新增 `taskTypes`：image/video（含 cancel/getStatus stub，复用 db.updateRequest / getRequestById）
+- 新增 `sidebarLinks`：Image / Video 两个链接（icon 内嵌 SVG）
+- 新增 `/chat-static/*` 路由：sibling 引用 `../t2a-chat/public/`，运行时实时读取
+- `imagine/chat-routes.js` 鉴权同步切换为 cookie（兼容老的 `?user_password=` 兜底，便于过渡）
+
+#### 3. imagine 前端
+- 新 `public/chat.html`：基于 t2a-chat 通用版，引用 `/chat-static/*.js + .css` + `imagine-adapter.js + imagine-chat.css`
+- 新 `public/imagine-adapter.js`：
+  - 注册 input-buttons "上传参考图"
+  - 注册 image-card / video-card task renderer（覆盖默认）
+  - 监听 `tool:end` → 检测 generate_image/video 的 task_id → 推 task panel + tool row 加角标
+  - 监听 `system:event` → imagine.task → 增强渲染图片/视频结果 + 推 task panel
+  - 监听 `history:loaded` → 从历史 tool_calls 反查 task → 重建 task panel
+  - 自有 task detail modal、lightbox、polling 逻辑
+- 新 `public/imagine-chat.css`：task panel + modal + image preview + lightbox 样式（约 50 行）
+- 旧 `chat.html / chat.js / chat.css / ws-manager.js` 重命名为 `.bak`（保留备份）
+- sidebar links 改由后端 sidebarLinks 配置注入（不再硬编码 HTML）
+
+### Task 表策略（决策）
+imagine 的 generate/video 任务**继续用 imagine 自己的 `requests` 表**（含 prompt/negative_prompt/width/height/model/error_msg/raw_response 等业务字段）。
+
+**t2a-chat 的 tasks 表对 imagine 来说不会被填充**，因为：
+- imagine task 走 LLM tool 路径：用户消息 → LLM → tool call generate_image → tools-registry handler → tools.js createImageTask → 写 requests 表 → poller/回调 → pushSystemEvent
+- 不走 t2a-chat 的 `POST /api/chat/tasks` REST endpoint
+- 后端 `taskTypes` 配置主要为：(a) `/api/chat/models` 给前端展示模型枚举；(b) `/api/chat/tasks/:id/cancel` 等接口在未来扩展时可用
+
+前端看到的 task 数据通过 `/api/chat/task/:id`（imagine 专属，查 requests 表）获取，不走 `/api/chat/tasks/:id`（t2a-chat 通用，查 tasks 表）。
+
+### 鉴权流程（新）
+```
+[Browser]                       [Imagine Server]                  [DB]
+   │  POST /api/chat/login         │                                │
+   │  { password }                 │                                │
+   │ ─────────────────────────────►│  db.verifyUser(password) ─────►│
+   │                               │ ◄──────────────────── { id, name }
+   │ ◄─── Set-Cookie: imagine_pw   │                                │
+   │      { id, name }             │                                │
+   │                               │                                │
+   │  WS Upgrade /chat/ws          │                                │
+   │  (Cookie: imagine_pw=...)     │                                │
+   │ ─────────────────────────────►│  resolveWsUser(req)            │
+   │                               │   → parseCookies → verifyUser  │
+   │ ◄─── 101 Switch Protocol      │                                │
+   │ ◄─── { type: 'auth_ok' }      │                                │
+   │                               │                                │
+   │  GET /api/chat/conversations  │                                │
+   │  (Cookie 自动)                │                                │
+   │ ─────────────────────────────►│  resolveUser(req) → 同上       │
+   │ ◄─── [conversations]          │                                │
+```
+
+cookie 设置：`imagine_pw=<pw>; HttpOnly; Path=/; SameSite=Lax; Max-Age=7d`
+
+### 本地烟雾测试结果
+所有验证项 ✅ pass：
+- Login / Logout / Cookie 设置正确
+- `/api/chat/conversations` cookie 鉴权工作正常
+- `/api/chat/models` 返回 image/video task type 的所有 model
+- `/api/chat/config/ui` 返回 sidebarLinks
+- WS upgrade with cookie → 立即 auth_ok（user_id=10）
+- WS upgrade without cookie → 401 reject
+- `/api/chat/conversations` without cookie → 401
+- `/admin`、`/chat`、`/imagine-adapter.js`、`/chat-static/slots.js` 全部 200
+- 服务器启动成功，video poller 正常启动
+
+### 文件清单
+**imagine 新增**：
+- `public/imagine-adapter.js`（~470 行）
+- `public/imagine-chat.css`（~80 行）
+
+**imagine 修改**：
+- `server.js`（auth → 新格式 + login/logout endpoint + chat-static 路由 + taskTypes + sidebarLinks）
+- `chat-routes.js`（cookie 鉴权）
+- `public/chat.html`（基于 t2a-chat 通用版改写）
+
+**imagine 备份（.bak）**：
+- `public/chat.html.bak`、`chat.js.bak`、`chat.css.bak`、`ws-manager.js.bak`
+
+**t2a-chat 修改**：
+- `public/core.js`（cookie-based auth + 新事件 emit）
+- `public/ws-manager.js`（onclose 区分 1006-before-auth）
+- `src/chat-routes.js`（注释补充）
+
+### 未完事项 / 已知问题
+1. **本地上传图片功能**：imagine `/api/upload` 返回的 URL 写死 `/imagine/uploads/...`（生产 caddy 反代用），本地直连应该是 `/uploads/...`。这是 P2 之前就存在的问题，不影响 chat / 工具调用主流程。
+2. **welcome-suggestions 侧栏**：目前没注册建议（旧 imagine 写死了 3 个），可在后续把 welcome 建议也通过 `sidebarLinks/welcomeSuggestions` 后端配置或 adapter 注册。
+3. **历史 tool 消息的 task badge 装饰**：当从历史回放渲染时，dom-helpers 渲染的 `.axis-msg.tool` 没有 task_id 信息（因为 dom-helpers 不知道 imagine 的契约）。adapter 的 `_decorateHistoricalToolBadges` 目前是空 stub。改进路径：让 dom-helpers 也 emit 一个 `history:tool-rendered` 事件，或让 dom-helpers 把 tool result 也传过来供 adapter 解析。可放 v0.3.0。
+4. **部署**：未跑 deploy.sh，本地只做了启动 + curl smoke test。kyo 拍板部署时需注意：caddy 反代 imagine 时要保留 cookie（`Cookie` header），不阻拦 cross-path。
+
+### 踩坑记录
+1. **WS auth 不一致**：P0 后端切到 upgrade 阶段 resolveWsUser，P1 前端 ws-manager 仍发 `auth` 消息。靠 server 默认 case 忽略才没崩，但 close code 1006（HTTP 401 表现在 WebSocket 层）会进入 reconnect loop。修复：onclose 时如果未曾 authenticated，视为 auth 失败 → 弹登录页，不重连。
+2. **EADDRINUSE 后台进程**：第一次烟雾测试中后台 server 没被 wait，第二次跑 spawn 立刻 EADDRINUSE。提醒：测试要 pkill 干净再起。
+3. **imagine /api/upload 返回 URL**：写死 `/imagine/uploads/...`，本地不走反代时 URL 解析会断。这条是历史问题，未涉及本次改动。
+

@@ -10,6 +10,9 @@ async function handle(req, res, ctx) {
   const url = req.url.split('?')[0];
   const method = req.method;
 
+  // v0.2.0 P2: 宿主可以以下方式提供 login/logout，t2a-chat 自己不提供默认实现
+  // 实际 login endpoint 由宿主 server.js 在 t2a-chat 路由前拦截处理
+
   // POST /api/chat — 发送消息（创建对话）
   if (url === '/api/chat' && method === 'POST') {
     const chatHandler = require('./chat-handler');

@@ -44,7 +44,11 @@ class ChatWSManager {
 
     this.ws.onopen = () => {
       this._reconnectDelay = 1000;
-      this._send({ type: 'auth', password: this.password });
+      // v0.2.0 P2: 不再发 auth 消息。后端在 HTTP upgrade 阶段已通过 cookie 鉴权。
+      // 兼容老后端：如果传入了 password，仍然发一遍（老后端会认；新后端忽略 default 分支）
+      if (this.password) {
+        this._send({ type: 'auth', password: this.password });
+      }
     };
 
     this.ws.onmessage = (evt) => {
@@ -54,10 +58,11 @@ class ChatWSManager {
     };
 
     this.ws.onclose = (evt) => {
+      const wasAuthed = this.authenticated;
       this.authenticated = false;
-      if (evt.code === 4001) {
-        // auth failed
-        this.onAuth({ success: false, error: 'Invalid password' });
+      // 4001 = 后端主动鉴权失败；1006 + 不曾鉴权过 = upgrade 401（新后端鉴权失败路径）
+      if (evt.code === 4001 || (!wasAuthed && evt.code === 1006)) {
+        this.onAuth({ success: false, error: 'Invalid password or session expired' });
         return;
       }
       this._reconnect();

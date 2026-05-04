@@ -5,7 +5,10 @@
 (function () {
   'use strict';
 
-  const API_BASE = '/api/chat';
+  // v0.2.0 P2: API_BASE / LOGIN_URL 可由宿主通过 window.T2A_CHAT_CONFIG 覆盖
+  const _cfg = window.T2A_CHAT_CONFIG || {};
+  const API_BASE = _cfg.apiBase || '/api/chat';
+  const LOGIN_URL = _cfg.loginUrl || (API_BASE + '/login');
   let currentConvId = null;
   let isStreaming = false;
   let wsManager = null;
@@ -43,15 +46,38 @@
   function setPw(pw) { localStorage.setItem('t2a-chat-pw', pw); }
   function clearPw() { localStorage.removeItem('t2a-chat-pw'); }
 
-  function doLogin() {
+  async function doLogin() {
     const pw = document.getElementById('loginPass').value.trim();
     if (!pw) return;
     const btn = document.getElementById('loginBtn');
     btn.disabled = true;
     btn.textContent = 'Connecting...';
     document.getElementById('loginError').classList.remove('show');
-    setPw(pw);
-    connectWebSocket(pw);
+
+    // v0.2.0 P2: 先调宿主 login 接口（设置 cookie），成功后再连 WS
+    try {
+      const res = await fetch(LOGIN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ password: pw }),
+      });
+      if (!res.ok) {
+        let errMsg = 'Invalid password';
+        try { const j = await res.json(); if (j && j.error) errMsg = j.error; } catch (e) {}
+        document.getElementById('loginError').textContent = errMsg;
+        document.getElementById('loginError').classList.add('show');
+        btn.disabled = false; btn.textContent = 'Sign In';
+        return;
+      }
+      // 登录成功，cookie 已 set；保存密码方便重连提示，但鉴权走 cookie
+      setPw(pw);
+      connectWebSocket(pw);
+    } catch (err) {
+      document.getElementById('loginError').textContent = 'Network error';
+      document.getElementById('loginError').classList.add('show');
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
   }
 
   function connectWebSocket(pw) {
@@ -85,6 +111,8 @@
       loadConversations();
       if (window._t2aSlots) window._t2aSlots.loadUiConfig(API_BASE);
       _loadModels();
+      // v0.2.0 P2: 触发 ready 事件，adapter 可以做后置初始化
+      if (window._t2aSlots) window._t2aSlots.emit('ready', { apiBase: API_BASE });
     } else {
       document.getElementById('loginError').textContent = data.error || 'Invalid password';
       document.getElementById('loginError').classList.add('show');
@@ -139,6 +167,8 @@
     const row = dom.appendToolMsg({ id: data.id, name: data.name, args: data.args || {}, status: 'processing' });
     if (data.id) toolRows[data.id] = row;
     dom.scrollToBottom();
+    // v0.2.0 P2: 暴露给 adapter 做后处理（如：imagine 把 tool row 升级成 task badge）
+    if (window._t2aSlots) window._t2aSlots.emit('tool:call', { ...data, row });
   }
 
   function handleToolEnd(data) {
@@ -152,6 +182,8 @@
       }
     }
     dom.scrollToBottom();
+    // v0.2.0 P2: adapter 钩子
+    if (window._t2aSlots) window._t2aSlots.emit('tool:end', { ...data, row });
   }
 
   function handleToolError(data) {
@@ -162,6 +194,7 @@
       if (badge) { badge.className = 'axis-badge error'; badge.textContent = data.error ? String(data.error).slice(0, 40) : 'error'; }
     }
     dom.toast('工具出错：' + (data.error || 'unknown'), 'error');
+    if (window._t2aSlots) window._t2aSlots.emit('tool:error', { ...data, row });
   }
 
   function handleSystemEvent(data) {
@@ -201,10 +234,9 @@
 
   // ---- 会话管理 ----
   async function loadConversations() {
-    const pw = getPw();
-    if (!pw) return;
     try {
-      const res = await fetch(API_BASE + '/conversations?user_password=' + encodeURIComponent(pw));
+      // v0.2.0 P2: 鉴权走 cookie，不再传 user_password
+      const res = await fetch(API_BASE + '/conversations', { credentials: 'include' });
       if (!res.ok) return;
       const convs = await res.json();
       const list = document.getElementById('convList');
@@ -236,19 +268,17 @@
 
   async function deleteConversation(id) {
     if (!confirm('Delete this conversation?')) return;
-    const pw = getPw();
     await fetch(API_BASE + '/conversations/' + id, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_password: pw })
+      credentials: 'include',
     });
     if (String(currentConvId) === String(id)) newConversation();
     loadConversations();
   }
 
   async function loadMessages(convId) {
-    const pw = getPw();
     try {
-      const res = await fetch(API_BASE + '/conversations/' + convId + '?user_password=' + encodeURIComponent(pw));
+      const res = await fetch(API_BASE + '/conversations/' + convId, { credentials: 'include' });
       if (!res.ok) return;
       const data = await res.json();
       document.getElementById('chatTitle').textContent = (data.conversation && data.conversation.title) || 'Chat';
@@ -256,6 +286,8 @@
       if (!data.messages || !data.messages.length) { dom.showWelcome(); return; }
       dom.renderHistory(data.messages);
       dom.scrollToBottom();
+      // v0.2.0 P2: adapter 钩子，可基于历史回放 tool_calls 还原任务状态
+      if (window._t2aSlots) window._t2aSlots.emit('history:loaded', { conversationId: convId, messages: data.messages, raw: data });
     } catch (e) { console.error('loadMessages error:', e); dom.toast('加载消息失败', 'warning'); }
   }
 
@@ -294,6 +326,8 @@
   }
   function logout() {
     clearPw(); if (wsManager) wsManager.disconnect();
+    // v0.2.0 P2: 通知宿主清 cookie
+    fetch(API_BASE + '/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     document.getElementById('app').style.display = 'none';
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('loginPass').value = '';
@@ -309,14 +343,14 @@
   async function _loadModels(taskType) {
     try {
       const url = API_BASE + '/models' + (taskType ? '?taskType=' + encodeURIComponent(taskType) : '');
-      const res = await fetch(url);
+      const res = await fetch(url, { credentials: 'include' });
       if (res.ok) _modelsCache = await res.json();
     } catch (e) { console.warn('[t2aChat] loadModels failed:', e); }
   }
 
   async function apiCancelTask(taskId) {
     try {
-      const res = await fetch(API_BASE + '/tasks/' + taskId + '/cancel', { method: 'POST' });
+      const res = await fetch(API_BASE + '/tasks/' + taskId + '/cancel', { method: 'POST', credentials: 'include' });
       const result = await res.json();
       if (window._t2aSlots) window._t2aSlots.emit('task:cancelled', { taskId, result });
       return result;
@@ -327,6 +361,7 @@
     try {
       const res = await fetch(API_BASE + '/tasks', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ type, params }),
       });
       const result = await res.json();
@@ -337,7 +372,7 @@
 
   async function apiGetTaskStatus(taskId) {
     try {
-      const res = await fetch(API_BASE + '/tasks?task_id=' + encodeURIComponent(taskId));
+      const res = await fetch(API_BASE + '/tasks/' + encodeURIComponent(taskId), { credentials: 'include' });
       if (res.ok) return await res.json();
     } catch (e) { console.error('[t2aChat] getTaskStatus error:', e); }
     return null;
@@ -364,9 +399,10 @@
   };
 
   // ---- 自动登录 + 事件绑定 ----
+  // v0.2.0 P2: cookie-based auth，启动时直接尝试连接 WS。
+  // 如果 cookie 还在 → upgrade 鉴权通过 → auth_ok；否则 401 close → 显示登录浮层。
   (function () {
-    const pw = getPw();
-    if (pw) connectWebSocket(pw);
+    connectWebSocket(getPw() || '');
   })();
 
   document.getElementById('loginPass').addEventListener('keydown', function (e) {
@@ -377,4 +413,13 @@
     window._t2aSlots.on('suggestion:clicked', function (data) { if (data.text) sendMessage(data.text); });
     window._t2aSlots.on('task:cancel-request', function (data) { if (data.taskId) apiCancelTask(data.taskId); });
   }
+
+  // v0.2.0 P2: 当 ws close 4001 表示鉴权失败 → 显示登录浮层
+  window.addEventListener('focus', function () {
+    // 简单 hook：focus 时若未登录态则确保浮层可见
+    if (wsManager && !wsManager.authenticated) {
+      const overlay = document.getElementById('loginOverlay');
+      if (overlay && overlay.classList.contains('hidden') === false) return;
+    }
+  });
 })();
