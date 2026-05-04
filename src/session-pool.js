@@ -11,6 +11,7 @@ const {
 } = require('@t2a/core');
 
 const { getStorage } = require('./storage');
+const { FORM_BLOCK_SYSTEM_PROMPT } = require('./form-block-prompt');
 
 const MAX_SESSIONS = 200;
 
@@ -25,6 +26,7 @@ class SessionPool {
    */
   constructor(deps) {
     this._deps = deps;
+    this._enableFormBlocks = !!deps.enableFormBlocks;
     /** @type {Map<string, import('@t2a/core').Session>} */
     this._map = new Map();
   }
@@ -118,13 +120,22 @@ class SessionPool {
       ? systemEventTemplate
       : defaultSystemEventTemplate;
 
+    // --- 拼接 system prompt ---
+    const userPrompt = agentConfig.system_prompt || '';
+    let composedPrompt = userPrompt;
+    if (this._enableFormBlocks) {
+      composedPrompt = userPrompt
+        ? userPrompt + '\n\n---\n\n' + FORM_BLOCK_SYSTEM_PROMPT
+        : FORM_BLOCK_SYSTEM_PROMPT;
+    }
+
     const session = new Session({
       sessionId: key,
       storage: getStorage(),
       llm: llmClients,
       tools: toolRegistry,
       model: modelNames,
-      systemPrompt: agentConfig.system_prompt || undefined,
+      systemPrompt: composedPrompt || undefined,
       llmFallback: llmClients.length > 1 ? { timeoutMs: 30000, maxRetries: 1 } : undefined,
       config: {
         contextMaxTokens,

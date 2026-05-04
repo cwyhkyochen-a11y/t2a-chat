@@ -32,6 +32,7 @@ function createChatApp(options) {
     modelRouter = {},       // { defaults: {}, rules: [] }
     sidebarLinks = [],      // [{ url, label, icon }]
     branding = {},          // { name?, logo?, primaryColor? }
+    enableFormBlocks = false, // 是否在 system prompt 注入 form 围栏使用说明
   } = options;
 
   // 验证 auth 格式
@@ -62,7 +63,7 @@ function createChatApp(options) {
   const taskRegistry = new TaskRegistry(taskTypes, modelRouter);
 
   // Session Pool
-  const sessionPool = new SessionPool({ db, dbConfig, dbChatLLM, tools, systemEventTemplate });
+  const sessionPool = new SessionPool({ db, dbConfig, dbChatLLM, tools, systemEventTemplate, enableFormBlocks });
 
   // 构建路由表
   const chatHandler = require('./chat-handler');
