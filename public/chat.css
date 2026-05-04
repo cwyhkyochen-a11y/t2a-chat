@@ -83,6 +83,19 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .bubble ul,.bubble ol{margin:8px 0;padding-left:1.5em}
 .bubble-stopped-tag{display:inline-block;margin-left:6px;color:var(--color-text-tertiary);font-size:11px;font-style:italic}
 
+/* ---- Interlude（俚语）：assistant 气泡的弱化变体 ---- */
+.message.assistant.interlude .bubble{background:#fafaf9;border-color:#ececea;font-style:italic;font-size:13px;color:var(--color-text);opacity:0.78;line-height:1.6}
+.message.assistant.interlude .bubble p{margin:0}
+
+/* ---- System message：系统在说话，与 assistant 平起平坐 ---- */
+.message.system-msg{align-self:flex-start;display:flex;gap:10px;align-items:flex-start;animation:fadeIn 0.15s ease;min-width:0;max-width:72%}
+.message.system-msg .avatar{width:28px;height:28px;border-radius:50%;background:#f0f0ee;border:1px solid var(--color-border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.message.system-msg .avatar svg{color:var(--color-text-secondary);width:14px;height:14px}
+.message.system-msg .system-body{display:flex;flex-direction:column;gap:6px;min-width:0}
+.message.system-msg .system-bubble{background:#eef2f6;border:1px solid #dfe5ec;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.6;color:var(--color-text);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.message.system-msg .system-source{display:inline-block;font-family:var(--font-mono);font-size:10.5px;color:var(--color-text-secondary);background:rgba(255,255,255,0.7);padding:1px 6px;border-radius:3px;border:1px solid rgba(0,0,0,0.04);letter-spacing:0.2px;flex-shrink:0}
+.message.system-msg .system-text{color:var(--color-text);word-break:break-word;flex:1;min-width:0}
+
 /* Tool call axis message */
 .axis-msg{align-self:flex-start;max-width:72%;display:flex;gap:10px;align-items:flex-start;animation:fadeIn 0.15s ease;min-width:0}
 .axis-msg .axis-body{flex:1;min-width:0;border-radius:8px;padding:8px 12px;font-size:12px;display:flex;flex-direction:column;gap:4px}
@@ -103,9 +116,6 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .axis-msg.tool .axis-badge.done{background:rgba(15,123,108,0.1);color:var(--color-success)}
 .axis-msg.tool .axis-badge.error{background:rgba(224,62,62,0.1);color:var(--color-error)}
 
-/* System event */
-.axis-msg.event .axis-body{background:rgba(255,243,205,0.6);border:1px dashed rgba(217,115,13,0.3)}
-.axis-msg.event .axis-label{color:var(--color-warning)}
 
 /* Notice */
 .notice-axis{display:flex;justify-content:center;padding:8px 0}

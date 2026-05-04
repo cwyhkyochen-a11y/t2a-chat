@@ -174,7 +174,9 @@
   }
 
   function handleInterlude(data) {
-    dom.appendNoticeMsg(data.text || '');
+    streamCtx.finalizeSegment();
+    dom.hideThinking();
+    dom.appendInterludeMsg(data.text || '');
     dom.scrollToBottom();
   }
 

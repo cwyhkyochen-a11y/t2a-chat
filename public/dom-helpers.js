@@ -7,6 +7,7 @@
   // SVG 图标
   const IC_USER = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
   const IC_BOT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>';
+  const IC_GEAR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
 
   // ---- 转义 ----
   function esc(s) {
@@ -105,16 +106,27 @@
     return div;
   }
 
-  // ---- 系统事件渲染 ----
+  // ---- 俚语（interlude）气泡 ----
+  function appendInterludeMsg(text) {
+    var container = ensureContainer();
+    var div = document.createElement('div');
+    div.className = 'message assistant interlude';
+    div.innerHTML = '<div class="avatar">' + IC_BOT + '</div><div><div class="bubble">' + esc(text || '') + '</div></div>';
+    container.appendChild(div);
+    return div;
+  }
+
+  // ---- 系统事件渲染（升级为一等公民） ----
   function appendSystemEventMsg(source, summary) {
     var container = ensureContainer();
     var div = document.createElement('div');
-    div.className = 'axis-msg event';
+    div.className = 'message system-msg';
     div.innerHTML =
-      '<div class="axis-body">' +
-        '<div class="axis-head">' +
-          '<span class="axis-label">⚙ ' + esc(source) + '</span>' +
-          '<span class="axis-summary">' + esc(summary) + '</span>' +
+      '<div class="avatar">' + IC_GEAR + '</div>' +
+      '<div class="system-body">' +
+        '<div class="bubble system-bubble">' +
+          '<span class="system-source">' + esc(source) + '</span>' +
+          '<span class="system-text">' + esc(summary) + '</span>' +
         '</div>' +
       '</div>';
     container.appendChild(div);
@@ -168,6 +180,8 @@
             }
           } catch (e) {}
         }
+      } else if (m.role === 'interlude') {
+        appendInterludeMsg(m.content || '');
       } else if (m.role === 'notice') {
         appendNoticeMsg(m.content || '');
       } else if (m.role === 'system_event') {
@@ -215,10 +229,10 @@
 
   // ---- 暴露 ----
   window._t2aDom = {
-    IC_USER, IC_BOT,
+    IC_USER, IC_BOT, IC_GEAR,
     esc, renderMd,
     ensureContainer, scrollToBottom,
-    appendUserBubble, appendAssistantBubble, appendToolMsg,
+    appendUserBubble, appendAssistantBubble, appendInterludeMsg, appendToolMsg,
     appendSystemEventMsg, appendNoticeMsg,
     showThinking, hideThinking,
     renderHistory, showWelcome,
