@@ -1,5 +1,24 @@
 # Changelog - t2a-chat
 
+## v0.4.0 (2026-05-05)
+**Form Block 体系 — 结构化表单交互**
+
+### 核心引擎
+- form-block-parser: mini tokenizer + recursive parser（无 eval）
+- form-renderer: render/collect/validate/markSubmitted/markStale
+- form-submit: 事件委托 + 校验 + 序列化 [表单回复] 格式
+- dom-helpers: sentinel-token 方案 + inferFormStates 历史回放
+- chat.css: 三态样式 (unsubmitted/submitted/stale)
+
+### 启用开关 + Prompt
+- enableFormBlocks 配置项（宿主按需开关）
+- system prompt 自动注入 form block 语法规格
+- prompt 优化: select max / key 命名 / number max 语义
+
+### Bug 修复 + 附录字段
+- **fix**: form-submit.js 加载顺序（移到 core.js 之前）
+- **feat**: SDK 自动追加「附加说明」textarea（方案 B，agent 不感知）
+
 ## v0.3.0 (2026-05-05)
 **批次 2 — 视觉升级 + 性能优化 + 切换 session 体验**
 
