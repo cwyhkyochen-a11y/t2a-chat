@@ -57,6 +57,31 @@
     }
     block.appendChild(fieldsWrap);
 
+    // 附录字段（SDK 自动注入）
+    var extraField = el('div', 'form-field form-field-extra');
+    var extraLabel = el('label', 'form-label');
+    extraLabel.textContent = '附加说明';
+    var optSpan = el('span', 'form-optional');
+    optSpan.textContent = '（选填，≤500字）';
+    extraLabel.appendChild(optSpan);
+    extraField.appendChild(extraLabel);
+    var extraTa = el('textarea', 'form-extra-input', {
+      placeholder: '有其他想补充的可以写在这里...',
+      maxlength: '500',
+      rows: '2'
+    });
+    extraField.appendChild(extraTa);
+    var extraCount = el('div', 'form-extra-count');
+    var extraCurrent = el('span', 'form-extra-current');
+    extraCurrent.textContent = '0';
+    extraCount.appendChild(extraCurrent);
+    extraCount.appendChild(document.createTextNode('/500'));
+    extraField.appendChild(extraCount);
+    extraTa.addEventListener('input', function () {
+      extraCurrent.textContent = String(extraTa.value.length);
+    });
+    block.appendChild(extraField);
+
     // actions
     var actions = el('div', 'form-actions');
     var submitBtn = el('button', 'form-submit-btn');

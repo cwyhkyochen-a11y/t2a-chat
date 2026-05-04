@@ -61,6 +61,13 @@
     var result = renderer.collect(formEl);
     var text = serializeFormValues(result);
 
+    // 附录
+    var extraEl = formEl.querySelector('.form-extra-input');
+    var extraVal = extraEl ? extraEl.value.trim() : '';
+    if (extraVal) {
+      text += '\n附加说明: ' + extraVal;
+    }
+
     // 回调发送
     if (window._t2aFormSubmit && typeof window._t2aFormSubmit.onSubmit === 'function') {
       window._t2aFormSubmit.onSubmit(text, formEl);

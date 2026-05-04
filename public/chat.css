@@ -362,3 +362,10 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .form-block[data-state="stale"] .form-submitted-tag{display:inline-flex;color:var(--color-text-tertiary)}
 .form-block[data-state="stale"] .form-submitted-icon{background:var(--color-text-tertiary)}
 .form-block[data-state="stale"] .form-submitted-text::after{content:"（已过期）";margin-left:4px;color:var(--color-warning);font-size:11px}
+
+/* form 附录字段（SDK 自动注入） */
+.form-block .form-field-extra{margin-top:4px;padding-top:12px;border-top:1px solid var(--color-border)}
+.form-block .form-extra-input{width:100%;min-height:48px;max-height:120px;resize:vertical;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;font-size:13px;line-height:1.5;font-family:inherit;background:var(--color-bg);color:var(--color-text);transition:border-color 0.15s;box-sizing:border-box}
+.form-block .form-extra-input:focus{outline:none;border-color:var(--color-text)}
+.form-block .form-extra-count{text-align:right;font-size:11px;color:var(--color-text-tertiary);margin-top:4px}
+.form-block .form-optional{font-size:12px;color:var(--color-text-tertiary);font-weight:normal;margin-left:4px}
