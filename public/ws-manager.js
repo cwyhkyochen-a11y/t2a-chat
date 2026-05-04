@@ -29,7 +29,11 @@ class ChatWSManager {
 
   _buildWsUrl() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return proto + '//' + location.host + '/ws/chat';
+    // v0.2.0+: 后端 wsPath = basePath + '/ws'，basePath 默认 '/chat' → '/chat/ws'
+    // 允许宿主通过 window.T2A_CHAT_CONFIG.wsPath 覆盖
+    const cfg = (typeof window !== 'undefined' && window.T2A_CHAT_CONFIG) || {};
+    const wsPath = cfg.wsPath || '/chat/ws';
+    return proto + '//' + location.host + wsPath;
   }
 
   connect() {

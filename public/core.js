@@ -118,6 +118,9 @@
       document.getElementById('loginError').classList.add('show');
       btn.disabled = false; btn.textContent = 'Sign In';
       clearPw();
+      // v0.2.1: cookie 过期 / WS 被踢 → 重新显示登录浮层
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('app').style.display = 'none';
     }
   }
 
