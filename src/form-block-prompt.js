@@ -15,15 +15,17 @@ submit: "提交按钮文案"
 \`\`\`
 
 - 围栏标识必须是 \`form\`
-- 每行一个字段：\`key: { ...属性 }\`，key 是英文小写，作为提交回填的字段名
+- 每行一个字段：\`key: { ...属性 }\`，key 是英文标识符（camelCase 推荐），作为提交回填的字段名
 - 最后一行必须是 \`submit: "按钮文案"\`
 
 ### 字段类型
 
-- \`select\`：单选/多选。属性 \`options: string[]\` 必填，\`max: number\` 可选（>1 时为多选，默认单选）
+- \`select\`：单选/多选。属性 \`options: string[]\` 必填，\`max: number\` 可选
+  - \`max\` 省略时：options ≤ 2 默认单选，> 2 默认多选不限
+  - 需要强制单选请显式 \`max: 1\`，限定多选上限请用 \`max: N\`
 - \`text\`：单行文本
 - \`textarea\`：多行文本
-- \`number\`：数字。属性 \`min\` / \`max\` 可选
+- \`number\`：数字。属性 \`min\` / \`max\` 可选（注意：number 的 \`max\` 是数值上限，不是选数上限）
 
 通用属性：\`label\`(必填) / \`type\`(必填) / \`required\`(可选 boolean) / \`placeholder\`(可选 string)
 
@@ -60,6 +62,7 @@ submit: "提交"
 - 每个表单 3-6 个字段，超过就拆
 - select 单个 option 文案不超过 10 字
 - 表单前后要有引导文字（前面说明为什么要填、后面说明提交后会发生什么）
+- 一次对话最多一个 form 块，不要连续发多个表单（用户会烦，也容易混乱）
 `;
 
 module.exports = { FORM_BLOCK_SYSTEM_PROMPT };
