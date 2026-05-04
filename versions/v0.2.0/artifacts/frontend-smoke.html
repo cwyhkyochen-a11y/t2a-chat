@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>t2a-chat v0.2.0 — Frontend Smoke Test</title>
+<style>
+body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+.pass { color: #4caf50; }
+.fail { color: #f44336; }
+pre { background: #2a2a2a; padding: 12px; border-radius: 6px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>t2a-chat v0.2.0 — Frontend Smoke Test</h1>
+<pre id="log"></pre>
+
+<!-- 最小化 DOM 依赖 -->
+<div id="loginOverlay" class="hidden"></div>
+<div id="app" style="display:none">
+  <div id="wsBanner"></div>
+  <div id="convList"></div>
+  <div id="chatTitle"></div>
+  <div id="messages"></div>
+  <div id="slot-input-buttons"></div>
+  <div id="slot-sidebar-links"></div>
+  <div id="slot-welcome-suggestions"></div>
+  <div id="msgInput"></div>
+  <div id="sendBtn" style="display:flex"></div>
+  <div id="stopBtn" style="display:none"></div>
+  <div id="toastContainer"></div>
+  <div id="settingsModal"></div>
+  <div id="settingsPass"></div>
+  <input id="loginPass" type="password">
+  <button id="loginBtn">Sign In</button>
+  <div id="loginError"></div>
+  <div id="sidebar"></div>
+</div>
+
+<!-- Mock ChatWSManager -->
+<script>
+class ChatWSManager {
+  constructor(opts) { this.opts = opts; this.authenticated = false; }
+  connect() {}
+  disconnect() {}
+  subscribe() {}
+  unsubscribe() {}
+  send() {}
+  interrupt() {}
+}
+</script>
+
+<!-- 加载模块 -->
+<script src="../../public/slots.js"></script>
+<script src="../../public/task-renderer.js"></script>
+<script src="../../public/core.js"></script>
+<script src="../../public/chat.js"></script>
+
+<script>
+const log = document.getElementById('log');
+let passed = 0;
+let failed = 0;
+
+function assert(condition, label) {
+  if (condition) {
+    log.innerHTML += '<span class="pass">✓ PASS</span> ' + label + '\n';
+    passed++;
+  } else {
+    log.innerHTML += '<span class="fail">✗ FAIL</span> ' + label + '\n';
+    failed++;
+  }
+}
+
+// 1. window.t2aChat 存在
+assert(typeof window.t2aChat === 'object', 'window.t2aChat exists');
+
+// 2. API surface
+assert(typeof window.t2aChat.registerTaskRenderer === 'function', 'registerTaskRenderer is function');
+assert(typeof window.t2aChat.registerSlot === 'function', 'registerSlot is function');
+assert(typeof window.t2aChat.registerConfigPanel === 'function', 'registerConfigPanel is function');
+assert(typeof window.t2aChat.on === 'function', 'on is function');
+assert(typeof window.t2aChat.off === 'function', 'off is function');
+assert(typeof window.t2aChat.emit === 'function', 'emit is function');
+assert(typeof window.t2aChat.api === 'object', 'api namespace exists');
+assert(typeof window.t2aChat.api.sendMessage === 'function', 'api.sendMessage is function');
+assert(typeof window.t2aChat.api.cancelTask === 'function', 'api.cancelTask is function');
+assert(typeof window.t2aChat.api.createTask === 'function', 'api.createTask is function');
+assert(typeof window.t2aChat.api.getTaskStatus === 'function', 'api.getTaskStatus is function');
+
+// 3. 注册自定义 renderer
+let renderCalled = false;
+window.t2aChat.registerTaskRenderer('custom-card', {
+  render(task, container) {
+    renderCalled = true;
+    container.innerHTML = '<div>custom: ' + task.id + '</div>';
+  },
+  onUpdate(task, container) {},
+});
+assert(true, 'registerTaskRenderer custom-card no error');
+
+// 4. 渲染 task
+const testContainer = document.createElement('div');
+window._t2aTaskRenderer.renderTask({ id: 'test-1', type: 'image', status: 'processing', prompt: 'hello' }, testContainer);
+assert(testContainer.querySelector('.task-card') !== null, 'renderTask image-card creates element');
+
+window._t2aTaskRenderer.renderTask({ id: 'test-2', type: 'video', status: 'success', prompt: 'video', result: { url: '#' } }, testContainer);
+assert(testContainer.querySelectorAll('.task-card').length === 2, 'renderTask video-card added');
+
+window._t2aTaskRenderer.renderTask({ id: 'test-3', type: 'form_short', status: 'done', params: { key: 'val' } }, testContainer);
+assert(testContainer.querySelectorAll('.task-card').length === 3, 'renderTask form-short-card added');
+
+window._t2aTaskRenderer.renderTask({ id: 'test-4', type: 'form_file', status: 'processing', params: { fileName: 'a.xlsx' }, progress: 50 }, testContainer);
+assert(testContainer.querySelectorAll('.task-card').length === 4, 'renderTask form-file-card added');
+
+window._t2aTaskRenderer.renderTask({ id: 'test-5', type: 'text', status: 'success', prompt: 'text content' }, testContainer);
+assert(testContainer.querySelectorAll('.task-card').length === 5, 'renderTask text-card added');
+
+// 用自定义 renderer
+window._t2aTaskRenderer.renderTask({ id: 'test-6', type: 'custom', render: 'custom-card', status: 'processing' }, testContainer);
+assert(renderCalled, 'custom renderer was called');
+
+// 5. 注册 slot
+window.t2aChat.registerSlot('input-buttons', { id: 'upload', icon: '📎', label: '上传', onClick: () => {} });
+assert(document.getElementById('slot-input-buttons').children.length === 1, 'input-buttons slot rendered');
+
+window.t2aChat.registerSlot('sidebar-links', { id: 'link1', url: './', label: 'Image', icon: '🖼' });
+assert(document.getElementById('slot-sidebar-links').children.length === 1, 'sidebar-links slot rendered');
+
+// 6. 事件订阅
+let eventReceived = false;
+window.t2aChat.on('test:event', () => { eventReceived = true; });
+window.t2aChat.emit('test:event', {});
+assert(eventReceived, 'event subscription works');
+
+// 7. 兼容全局函数
+assert(typeof window.sendMessage === 'function', 'global sendMessage exists');
+assert(typeof window.doLogin === 'function', 'global doLogin exists');
+assert(typeof window.toggleSidebar === 'function', 'global toggleSidebar exists');
+
+// 总结
+log.innerHTML += '\n────────────────────────────────────\n';
+log.innerHTML += '总计: ' + (passed + failed) + ' | <span class="pass">通过: ' + passed + '</span> | <span class="fail">失败: ' + failed + '</span>\n';
+log.innerHTML += failed === 0 ? '<span class="pass">🎉 ALL PASSED</span>\n' : '<span class="fail">⚠️ HAS FAILURES</span>\n';
+</script>
+</body>
+</html>

@@ -82,3 +82,23 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+
+-- 通用 task 表（v0.2.0 新增）
+-- 任意宿主注册的 task type 都通过此表持久化
+CREATE TABLE IF NOT EXISTS tasks (
+  id TEXT PRIMARY KEY,                  -- task id（宿主可生成或由 t2a 自动生成）
+  conversation_id INTEGER,              -- 关联会话（可空，用于全局任务）
+  user_id INTEGER,                      -- 创建者
+  type TEXT NOT NULL,                   -- task type key（image/video/form_short/form_file/text/...）
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | running | success | failed | cancelled
+  params_json TEXT,                     -- 创建参数 JSON
+  result_json TEXT,                     -- 结果 JSON（宿主回填）
+  error TEXT,                           -- 失败原因
+  model TEXT,                           -- 实际使用模型
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  cancelled_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_conversation ON tasks(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);

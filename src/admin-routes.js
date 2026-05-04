@@ -27,8 +27,27 @@ async function handle(req, res, ctx, adminBasePath) {
     }
     if (subPath === '/config' && method === 'PUT') {
       const body = await readBody(req);
-      await ctx.dbConfig.updateAgentConfig(body);
+      const data = typeof body === 'string' || Buffer.isBuffer(body) ? JSON.parse(body.toString()) : body;
+      // T3: 默认模型仅可从宿主注入的枚举中选
+      if (data.model && ctx.taskRegistry) {
+        const allModels = ctx.taskRegistry.getModels();
+        if (allModels.length > 0 && !allModels.find(m => m.id === data.model)) {
+          return jsonRes(res, 400, { error: `model "${data.model}" 不在已注册的枚举中` });
+        }
+      }
+      const cur = ctx.dbConfig.getAgentConfig();
+      if (cur) ctx.dbConfig.updateAgentConfig(cur.id, data);
       return jsonRes(res, 200, { ok: true });
+    }
+
+    // --- Models (枚举查询，供 admin 选择默认模型) ---
+    if (subPath === '/models' && method === 'GET') {
+      if (!ctx.taskRegistry) return jsonRes(res, 200, { models: [], defaults: {} });
+      const taskType = params.get('taskType');
+      return jsonRes(res, 200, {
+        models: ctx.taskRegistry.getModels(taskType || undefined),
+        defaults: ctx.taskRegistry.getModelRouter().defaults,
+      });
     }
 
     // --- Overflow ---
@@ -67,6 +86,16 @@ async function handle(req, res, ctx, adminBasePath) {
       const registry = ctx.tools({ userId: 'admin', conversationId: null, baseUrl: '' });
       const tools = registry.toOpenAITools();
       return jsonRes(res, 200, tools);
+    }
+
+    // --- Tasks (admin 查看所有 task) ---
+    if (subPath === '/tasks' && method === 'GET') {
+      if (!ctx.taskRegistry) return jsonRes(res, 200, { data: [], total: 0 });
+      const limit = Math.min(200, parseInt(params.get('limit') || '50', 10));
+      const offset = parseInt(params.get('offset') || '0', 10);
+      const status = params.get('status') || undefined;
+      const data = ctx.taskRegistry.listTasks({ status, limit, offset });
+      return jsonRes(res, 200, { data });
     }
 
     // --- Sessions ---

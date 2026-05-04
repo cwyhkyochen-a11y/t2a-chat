@@ -1,6 +1,7 @@
 // chat-routes.js — chat 模块的非流式接口
 // 会话列表 / 详情 / 删除 / agent-config / settings
-// 所有函数接收 ctx 参数
+//
+// v0.2.0: 改造为统一通过 ctx.resolveUser(req) 鉴权，不再读 user_password 字段
 
 const { readBody, jsonRes } = require('./utils');
 
@@ -66,13 +67,10 @@ async function handle(req, res, ctx) {
 // ---- Handlers ----
 
 async function handleGetConversations(req, res, ctx) {
-  const { auth, dbChat } = ctx;
+  const { resolveUser, dbChat } = ctx;
   try {
-    const url = new URL(req.url, 'http://localhost');
-    const password = url.searchParams.get('user_password');
-    if (!password) return jsonRes(res, 401, { error: 'user_password is required' });
-    const user = auth(password);
-    if (!user) return jsonRes(res, 401, { error: '密码错误' });
+    const user = await resolveUser(req);
+    if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
     return jsonRes(res, 200, dbChat.getConversations(user.id));
   } catch (err) {
     return jsonRes(res, 500, { error: err.message });
@@ -80,12 +78,11 @@ async function handleGetConversations(req, res, ctx) {
 }
 
 async function handleCreateConversation(req, res, ctx) {
-  const { auth, dbChat } = ctx;
+  const { resolveUser, dbChat } = ctx;
   try {
+    const user = await resolveUser(req);
+    if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
     const body = JSON.parse((await readBody(req)).toString());
-    if (!body.user_password) return jsonRes(res, 401, { error: 'user_password is required' });
-    const user = auth(body.user_password);
-    if (!user) return jsonRes(res, 401, { error: '密码错误' });
     return jsonRes(res, 200, { id: dbChat.createConversation(user.id, body.title) });
   } catch (err) {
     return jsonRes(res, 500, { error: err.message });
@@ -93,12 +90,10 @@ async function handleCreateConversation(req, res, ctx) {
 }
 
 async function handleDeleteConversation(req, res, ctx, id) {
-  const { auth, dbChat, db } = ctx;
+  const { resolveUser, dbChat, db } = ctx;
   try {
-    const body = JSON.parse((await readBody(req)).toString());
-    if (!body.user_password) return jsonRes(res, 401, { error: 'user_password is required' });
-    const user = auth(body.user_password);
-    if (!user) return jsonRes(res, 401, { error: '密码错误' });
+    const user = await resolveUser(req);
+    if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
     const conv = dbChat.getConversation(id);
     if (!conv) return jsonRes(res, 404, { error: '对话不存在' });
     if (conv.user_id !== user.id) return jsonRes(res, 403, { error: '无权删除此对话' });
@@ -118,13 +113,10 @@ async function handleDeleteConversation(req, res, ctx, id) {
 
 // GET /api/chat/conversations/:id — 历史回放（单一数据源：t2a_messages）
 async function handleGetConversationDetail(req, res, ctx, id) {
-  const { auth, dbChat, db } = ctx;
+  const { resolveUser, dbChat, db } = ctx;
   try {
-    const url = new URL(req.url, 'http://localhost');
-    const password = url.searchParams.get('user_password');
-    if (!password) return jsonRes(res, 401, { error: 'user_password is required' });
-    const user = auth(password);
-    if (!user) return jsonRes(res, 401, { error: '密码错误' });
+    const user = await resolveUser(req);
+    if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
     const conv = dbChat.getConversation(id);
     if (!conv) return jsonRes(res, 404, { error: '对话不存在' });
     if (conv.user_id !== user.id) return jsonRes(res, 403, { error: '无权访问此对话' });
@@ -167,9 +159,16 @@ function handleGetAgentConfig(req, res, ctx) {
 }
 
 async function handleUpdateAgentConfig(req, res, ctx) {
-  const { dbConfig } = ctx;
+  const { dbConfig, taskRegistry } = ctx;
   try {
     const body = JSON.parse((await readBody(req)).toString());
+    // T3: 默认模型必须从枚举中选（如果传了 model 字段）
+    if (body.model && taskRegistry) {
+      const allModels = taskRegistry.getModels();
+      if (allModels.length > 0 && !allModels.find(m => m.id === body.model)) {
+        return jsonRes(res, 400, { error: `model "${body.model}" 不在已注册的枚举中` });
+      }
+    }
     const config = dbConfig.getAgentConfig();
     if (!config) return jsonRes(res, 404, { error: 'No agent config found' });
     dbConfig.updateAgentConfig(config.id, body);

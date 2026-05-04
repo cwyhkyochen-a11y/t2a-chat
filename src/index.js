@@ -1,13 +1,17 @@
 // t2a-chat 主入口
-// createChatApp(options) → { attachToServer, pushSystemEvent, getSessionPool }
+// createChatApp(options) → { attachToServer, pushSystemEvent, getSessionPool, getTaskRegistry }
+//
+// v0.2.0: 接受 taskTypes / modelRouter / auth.resolveUser / sidebarLinks / branding
 
 const { initWebSocket, pushToConversation } = require('./ws-server');
 const { SessionPool } = require('./session-pool');
-const { readBody, jsonRes } = require('./utils');
+const { TaskRegistry, init: initTaskRegistry } = require('./task-registry');
+const { jsonRes } = require('./utils');
 const dbChat = require('./db-chat');
 const dbChatLLM = require('./db-chat-llm');
 const dbConfig = require('./db-config');
 const storageModule = require('./storage');
+const taskRoutes = require('./task-routes');
 
 function checkAdminAuth(req, adminAuth) {
   if (!adminAuth) return false;
@@ -16,20 +20,34 @@ function checkAdminAuth(req, adminAuth) {
 
 function createChatApp(options) {
   const {
-    db,              // better-sqlite3 实例
-    auth,            // (password) => { id, name } | null
-    adminAuth,       // (req) => boolean
-    tools,           // ({ userId, conversationId, baseUrl }) => ToolRegistry
-    systemEventTemplate, // 可选
+    db,                     // better-sqlite3 实例
+    auth,                   // v0.2.0: { resolveUser, loginUrl?, resolveWsUser? }
+    adminAuth,              // (req) => boolean
+    tools,                  // ({ userId, conversationId, baseUrl }) => ToolRegistry
+    systemEventTemplate,    // 可选
     basePath = '/chat',
     adminBasePath = '/chat-admin',
+    // v0.2.0 新增
+    taskTypes = {},         // 宿主注册的 task type 定义
+    modelRouter = {},       // { defaults: {}, rules: [] }
+    sidebarLinks = [],      // [{ url, label, icon }]
+    branding = {},          // { name?, logo?, primaryColor? }
   } = options;
+
+  // 验证 auth 格式
+  if (!auth || typeof auth.resolveUser !== 'function') {
+    throw new Error('[t2a-chat] auth.resolveUser is required (must be an async function returning { id, name } or null)');
+  }
+  const resolveUser = auth.resolveUser;
+  const resolveWsUser = typeof auth.resolveWsUser === 'function' ? auth.resolveWsUser : auth.resolveUser;
+  const loginUrl = auth.loginUrl || null;
 
   // 初始化数据层
   dbChat.init(db);
   dbChatLLM.init(db);
   dbConfig.init(db);
   storageModule.init(db);
+  initTaskRegistry(db);
 
   // 初始化 schema（如果表不存在）
   const fs = require('fs');
@@ -39,6 +57,9 @@ function createChatApp(options) {
     const schema = fs.readFileSync(schemaPath, 'utf8');
     db.exec(schema);
   }
+
+  // Task Registry
+  const taskRegistry = new TaskRegistry(taskTypes, modelRouter);
 
   // Session Pool
   const sessionPool = new SessionPool({ db, dbConfig, dbChatLLM, tools, systemEventTemplate });
@@ -51,16 +72,20 @@ function createChatApp(options) {
   let _attached = false;
 
   function attachToServer(server) {
-    // WebSocket
-    const wss = initWebSocket(server, { db, dbChat, dbConfig, dbChatLLM, auth, sessionPool, basePath });
+    // WebSocket（用 resolveWsUser 鉴权）
+    const wss = initWebSocket(server, {
+      db, dbChat, dbConfig, dbChatLLM,
+      resolveWsUser, sessionPool, basePath,
+    });
     _attached = true;
 
     return {
       wss,
       handleRequest: createRequestHandler({
-        auth, adminAuth, basePath, adminBasePath,
+        resolveUser, adminAuth, basePath, adminBasePath,
         chatHandler, chatRoutes, adminRoutes,
         db, dbChat, dbConfig, dbChatLLM, sessionPool, tools,
+        taskRegistry, sidebarLinks, branding, loginUrl,
       }),
       pushToConversation,
     };
@@ -84,15 +109,25 @@ function createChatApp(options) {
     pushSystemEvent,
     pushToConversation: pushToConversationGuarded,
     getSessionPool: () => sessionPool,
+    getTaskRegistry: () => taskRegistry,
     // 暴露给宿主的数据层
     db: { chat: dbChat, llm: dbChatLLM, config: dbConfig },
   };
 }
 
 function createRequestHandler(deps) {
-  const { auth, adminAuth, basePath, adminBasePath, chatHandler, chatRoutes, adminRoutes, db, dbChat, dbConfig, dbChatLLM, sessionPool, tools } = deps;
+  const {
+    resolveUser, adminAuth, basePath, adminBasePath,
+    chatHandler, chatRoutes, adminRoutes,
+    db, dbChat, dbConfig, dbChatLLM, sessionPool, tools,
+    taskRegistry, sidebarLinks, branding, loginUrl,
+  } = deps;
 
-  const ctx = { auth, db, dbChat, dbConfig, dbChatLLM, sessionPool, tools };
+  // ctx 传递给各 route handler
+  const ctx = {
+    resolveUser, db, dbChat, dbConfig, dbChatLLM, sessionPool, tools,
+    taskRegistry, sidebarLinks, branding, loginUrl,
+  };
 
   return async function handleRequest(req, res) {
     const url = req.url.split('?')[0];
@@ -106,8 +141,18 @@ function createRequestHandler(deps) {
       return adminRoutes.handle(req, res, ctx, adminBasePath);
     }
 
-    // Chat API
-    if (url.startsWith('/api/chat/') || url === '/api/chat') {
+    // Task routes（与 basePath 绑定）
+    const chatPrefix = '/api/' + basePath.replace(/^\//, '');
+    // 匹配 tasks / models / config/ui 相关路由
+    const taskPrefixes = [chatPrefix + '/tasks', chatPrefix + '/models', chatPrefix + '/config/ui'];
+    const isTaskRoute = taskPrefixes.some(p => url === p || url.startsWith(p + '/') || url.startsWith(p + '?'));
+    if (isTaskRoute) {
+      const result = await taskRoutes.handle(req, res, ctx, basePath);
+      if (result !== false) return result;
+    }
+
+    // Chat API（用动态 basePath）
+    if (url.startsWith(chatPrefix + '/') || url === chatPrefix) {
       return chatRoutes.handle(req, res, ctx);
     }
 

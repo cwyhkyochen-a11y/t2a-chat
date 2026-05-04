@@ -1,5 +1,8 @@
 // WebSocket server for real-time chat events
 // 绑定到已有 http.Server
+//
+// v0.2.0: auth 改为 resolveWsUser（从 upgrade 请求鉴权），
+// 移除客户端 auth 消息流程，连接时即鉴权
 
 const WebSocket = require('ws');
 
@@ -7,8 +10,6 @@ let wss = null;
 
 // ---- 心跳 ----
 const PING_INTERVAL = 30000;
-const PONG_TIMEOUT = 10000;
-const AUTH_TIMEOUT = 30000;
 
 /**
  * @param {import('http').Server} server
@@ -17,31 +18,54 @@ const AUTH_TIMEOUT = 30000;
  * @param {object} deps.dbChat - db-chat 模块
  * @param {object} deps.dbConfig - db-config 模块
  * @param {object} deps.dbChatLLM - db-chat-llm 模块
- * @param {function} deps.auth - (password) => { id, name } | null
+ * @param {function} deps.resolveWsUser - (req) => { id, name } | null
  * @param {import('./session-pool').SessionPool} deps.sessionPool
  * @param {string} deps.basePath
  */
 function initWebSocket(server, deps) {
-  const { dbChat, auth, sessionPool, basePath } = deps;
+  const { dbChat, resolveWsUser, sessionPool, basePath } = deps;
   const wsPath = basePath + '/ws';
 
-  wss = new WebSocket.Server({ server, path: wsPath });
+  wss = new WebSocket.Server({ noServer: true });
+
+  // 在 HTTP upgrade 时完成鉴权
+  server.on('upgrade', async (req, socket, head) => {
+    const pathname = req.url ? req.url.split('?')[0] : '';
+    if (pathname !== wsPath) {
+      // 不是我们的 ws 路径，忽略（让其他 handler 处理）
+      socket.destroy();
+      return;
+    }
+
+    let user = null;
+    try {
+      user = await resolveWsUser(req);
+    } catch (err) {
+      console.error('[ws] resolveWsUser error:', err.message);
+    }
+    if (!user) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      ws.userId = user.id;
+      ws.userName = user.name;
+      ws.authenticated = true;
+      wss.emit('connection', ws, req);
+    });
+  });
 
   wss.on('connection', (ws, req) => {
-    ws.userId = null;
     ws.conversationId = null;
-    ws.authenticated = false;
     ws._unsubs = [];
     ws._alive = true;
     ws._baseUrl = buildBaseUrl(req);
     ws._deps = deps;
 
-    // Auth timeout
-    ws._authTimer = setTimeout(() => {
-      if (!ws.authenticated) {
-        ws.close(4000, 'auth timeout');
-      }
-    }, AUTH_TIMEOUT);
+    // 鉴权已在 upgrade 阶段完成，直接发 auth_ok
+    safeSend(ws, { type: 'auth_ok', user_id: ws.userId });
 
     // Heartbeat
     ws._pingInterval = setInterval(() => {
@@ -73,9 +97,7 @@ function buildBaseUrl(req) {
 }
 
 function cleanup(ws) {
-  clearTimeout(ws._authTimer);
   clearInterval(ws._pingInterval);
-  clearTimeout(ws._pongTimeout);
   unbindSession(ws);
 }
 
@@ -95,7 +117,6 @@ function safeSend(ws, obj) {
 // ---- 消息路由 ----
 function handleClientMessage(ws, msg) {
   switch (msg.type) {
-    case 'auth': return handleAuth(ws, msg);
     case 'subscribe': return handleSubscribe(ws, msg);
     case 'unsubscribe': return handleUnsubscribe(ws);
     case 'send': return handleSend(ws, msg);
@@ -107,27 +128,8 @@ function handleClientMessage(ws, msg) {
   }
 }
 
-// ---- Auth ----
-function handleAuth(ws, msg) {
-  const { auth } = ws._deps;
-  const user = auth(msg.password);
-  if (!user) {
-    safeSend(ws, { type: 'auth_fail', error: '密码错误' });
-    ws.close(4001, 'auth failed');
-    return;
-  }
-  ws.userId = user.id;
-  ws.authenticated = true;
-  clearTimeout(ws._authTimer);
-  safeSend(ws, { type: 'auth_ok', user_id: user.id });
-}
-
 // ---- Subscribe ----
 function handleSubscribe(ws, msg) {
-  if (!ws.authenticated) {
-    safeSend(ws, { type: 'error', error: 'not authenticated' });
-    return;
-  }
   const { dbChat, sessionPool } = ws._deps;
   const convId = msg.conversation_id;
   if (!convId) {
@@ -179,11 +181,6 @@ function handleUnsubscribe(ws) {
 
 // ---- Send ----
 function handleSend(ws, msg) {
-  if (!ws.authenticated) {
-    safeSend(ws, { type: 'error', error: 'not authenticated' });
-    return;
-  }
-
   const { dbChat, sessionPool } = ws._deps;
   let convId = msg.conversation_id;
   const message = msg.message || '';
@@ -245,7 +242,6 @@ function handleSend(ws, msg) {
 
 // ---- Interrupt ----
 function handleInterrupt(ws, msg) {
-  if (!ws.authenticated) return;
   const { sessionPool } = ws._deps;
   const convId = msg.conversation_id || ws.conversationId;
   if (!convId) return;

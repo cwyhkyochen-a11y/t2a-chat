@@ -200,3 +200,34 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
   .message{max-width:88%}
   .axis-msg{max-width:88%}
 }
+
+/* ---- Slot 插槽样式 ---- */
+.input-slot-buttons{display:flex;gap:4px;align-items:center}
+.input-slot-buttons .slot-btn{background:none;border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--color-text-secondary);font-size:12px;display:flex;align-items:center;gap:4px;transition:border-color var(--transition),color var(--transition)}
+.input-slot-buttons .slot-btn:hover{border-color:var(--color-border-focus);color:var(--color-text)}
+.sidebar-links{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.welcome-suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:center}
+.welcome-suggestions .suggestion{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;transition:border-color var(--transition),background var(--transition);color:var(--color-text-secondary)}
+.welcome-suggestions .suggestion:hover{border-color:var(--color-border-focus);background:var(--color-accent-bg);color:var(--color-text)}
+
+/* ---- Task 卡片样式 ---- */
+.task-card{margin:8px 0;max-width:320px;border-radius:8px;border:1px solid var(--color-border);overflow:hidden;animation:fadeIn 0.15s ease}
+.task-card-inner{padding:10px 12px}
+.task-card-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.task-card-icon{font-size:14px}
+.task-badge{font-size:11px;padding:1px 6px;border-radius:3px;white-space:nowrap}
+.task-badge--processing{background:rgba(46,170,220,0.12);color:var(--color-accent)}
+.task-badge--done{background:rgba(15,123,108,0.1);color:var(--color-success)}
+.task-badge--error{background:rgba(224,62,62,0.1);color:var(--color-error)}
+.task-cancel-btn{margin-left:auto;background:none;border:none;color:var(--color-text-secondary);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:3px}
+.task-cancel-btn:hover{color:var(--color-error);background:rgba(224,62,62,0.08)}
+.task-card-body{font-size:13px;color:var(--color-text-secondary)}
+.task-prompt{margin:0 0 6px;white-space:pre-wrap;word-break:break-word;line-height:1.4}
+.task-thumb{max-width:100%;border-radius:6px;margin-top:6px}
+.task-thumb-placeholder{width:60px;height:60px;background:var(--color-accent-bg);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-top:6px}
+.task-video-preview{max-width:100%;border-radius:6px;margin-top:6px}
+.task-kv{display:flex;gap:8px;font-size:12px;margin-bottom:2px}
+.task-kv-key{color:var(--color-text-secondary);font-weight:500;min-width:60px}
+.task-kv-val{color:var(--color-text);word-break:break-all}
+.task-progress{height:4px;background:var(--color-border);border-radius:2px;margin-top:6px;overflow:hidden}
+.task-progress-bar{height:100%;background:var(--color-accent);border-radius:2px;transition:width 0.3s ease}
