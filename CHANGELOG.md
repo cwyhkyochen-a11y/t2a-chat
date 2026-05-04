@@ -1,5 +1,29 @@
 # Changelog - t2a-chat
 
+## v0.3.0 (2026-05-05)
+**批次 2 — 视觉升级 + 性能优化 + 切换 session 体验**
+
+### 视觉升级
+- 俚语改 assistant 气泡 `.message.assistant.interlude`（斜体 + 浅米背景）
+- system_event 升格一等公民：齿轮 SVG 头像 + `.message.system-msg` 浅蓝灰气泡
+- imagine 任务卡片 badge 改 `.system-task-badge`
+
+### 性能优化
+- N+1 修复：getRequestsByIds 批量 IN 查询
+- pollTasks 并行：Promise.all + per-task catch
+- renderHistory 用 DocumentFragment（_renderBatchTarget 模块级游标）
+
+### 切换 session 体验
+- selectConversation 链路并行 + AbortController abort 旧 fetch
+- conversation:switching 事件 + epoch token 竞态保护
+- 加载动画：showMessagesLoading / task panel loading
+- 选中态立即更新（不等 fetch 回来）
+- tasksByConv Map 清理
+
+### system_event 联动
+- cancel task 触发 system_event，agent 主动感知
+- contextUsage DOM 修复
+
 ## v0.2.0 (2026-05-04)
 **Task 抽象 + 宿主契约 + 通用前端**
 
