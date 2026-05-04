@@ -77,7 +77,7 @@ async function handle(req, res, ctx, adminBasePath) {
 
       const rows = ctx.db.prepare(`
         SELECT c.id, c.user_id, c.title, c.created_at, c.updated_at,
-          (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count
+          (SELECT COUNT(*) FROM t2a_messages WHERE session_id = CAST(c.id AS TEXT) AND deleted_at IS NULL) as message_count
         FROM conversations c ORDER BY c.updated_at DESC LIMIT ? OFFSET ?
       `).all(pageSize, offset);
 
