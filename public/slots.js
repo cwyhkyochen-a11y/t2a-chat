@@ -89,7 +89,7 @@
         _renderWelcomeSuggestions();
         break;
       case 'config-panels':
-        // config 面板由 admin 页面处理，这里只 emit 事件
+        _renderConfigPanels();
         break;
     }
   }
@@ -196,6 +196,108 @@
     }
   }
 
+  // ---- Config panels rendering ----
+  function _renderConfigPanels() {
+    var container = document.getElementById('slot-config-panels');
+    if (!container) return;
+    var panels = _slots['config-panels'];
+    container.innerHTML = '';
+    for (var i = 0; i < panels.length; i++) {
+      var p = panels[i];
+      var div = document.createElement('div');
+      div.className = 'config-panel';
+      div.dataset.panelId = p.id;
+      var h4 = document.createElement('h4');
+      h4.textContent = p.label || p.id;
+      div.appendChild(h4);
+      var fieldsDiv = document.createElement('div');
+      fieldsDiv.className = 'config-fields';
+      var fields = p.fields || [];
+      for (var j = 0; j < fields.length; j++) {
+        var f = fields[j];
+        var wrap = document.createElement('div');
+        var lbl = document.createElement('label');
+        lbl.textContent = f.label || f.id;
+        lbl.setAttribute('for', 'panel-' + p.id + '-' + f.id);
+        wrap.appendChild(lbl);
+        var elId = 'panel-' + p.id + '-' + f.id;
+        if (f.type === 'select') {
+          var sel = document.createElement('select');
+          sel.id = elId;
+          sel.dataset.fieldId = f.id;
+          // options filled async in loadConfigPanels
+          wrap.appendChild(sel);
+        } else {
+          var inp = document.createElement('input');
+          inp.type = f.type === 'password' ? 'password' : 'text';
+          inp.id = elId;
+          inp.dataset.fieldId = f.id;
+          if (f.placeholder) inp.placeholder = f.placeholder;
+          wrap.appendChild(inp);
+        }
+        fieldsDiv.appendChild(wrap);
+      }
+      div.appendChild(fieldsDiv);
+      container.appendChild(div);
+    }
+  }
+
+  async function loadConfigPanels() {
+    _renderConfigPanels();
+    var panels = _slots['config-panels'];
+    for (var i = 0; i < panels.length; i++) {
+      var p = panels[i];
+      // resolve async options for select fields
+      var fields = p.fields || [];
+      for (var j = 0; j < fields.length; j++) {
+        var f = fields[j];
+        if (f.type === 'select') {
+          var sel = document.getElementById('panel-' + p.id + '-' + f.id);
+          if (!sel) continue;
+          var opts = f.options;
+          if (typeof opts === 'function') { try { opts = await opts(); } catch (e) { opts = []; } }
+          if (!Array.isArray(opts)) opts = [];
+          sel.innerHTML = '<option value="">(default)</option>';
+          for (var k = 0; k < opts.length; k++) {
+            var o = opts[k];
+            var opt = document.createElement('option');
+            opt.value = typeof o === 'object' ? o.value : o;
+            opt.textContent = typeof o === 'object' ? (o.label || o.value) : o;
+            sel.appendChild(opt);
+          }
+        }
+      }
+      // load current values
+      if (typeof p.onLoad === 'function') {
+        try {
+          var vals = await p.onLoad();
+          if (vals && typeof vals === 'object') {
+            for (var key in vals) {
+              var el = document.getElementById('panel-' + p.id + '-' + key);
+              if (el) el.value = vals[key] || '';
+            }
+          }
+        } catch (e) { console.warn('[t2aChat] config panel onLoad error:', p.id, e); }
+      }
+    }
+  }
+
+  async function saveConfigPanels() {
+    var panels = _slots['config-panels'];
+    for (var i = 0; i < panels.length; i++) {
+      var p = panels[i];
+      if (typeof p.onSave !== 'function') continue;
+      var vals = {};
+      var fields = p.fields || [];
+      for (var j = 0; j < fields.length; j++) {
+        var f = fields[j];
+        var el = document.getElementById('panel-' + p.id + '-' + f.id);
+        if (el) vals[f.id] = el.value;
+      }
+      try { await p.onSave(vals); } catch (e) { console.warn('[t2aChat] config panel onSave error:', p.id, e); }
+    }
+  }
+
   // ---- 工具函数 ----
   function _esc(s) {
     if (!s) return '';
@@ -213,5 +315,7 @@
     registerConfigPanel,
     getSlotItems,
     loadUiConfig,
+    loadConfigPanels,
+    saveConfigPanels,
   };
 })();
