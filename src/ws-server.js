@@ -271,6 +271,7 @@ function bindSessionEvents(ws, session) {
 
   const unsubs = [];
   unsubs.push(session.on('text', p => push('text', { delta: p.delta })));
+  unsubs.push(session.on('thinking', p => push('thinking', { delta: p.delta })));
   unsubs.push(session.on('tool_start', p => push('tool_call', { id: p.id, name: p.name, args: p.args })));
   unsubs.push(session.on('tool_end', p => push('tool_end', { id: p.id, name: p.name, result: p.result, durationMs: p.durationMs })));
   unsubs.push(session.on('tool_error', p => push('tool_error', { id: p.id, name: p.name, error: p.error && p.error.message || String(p.error) })));

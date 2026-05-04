@@ -252,3 +252,13 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .task-kv-val{color:var(--color-text);word-break:break-all}
 .task-progress{height:4px;background:var(--color-border);border-radius:2px;margin-top:6px;overflow:hidden}
 .task-progress-bar{height:100%;background:var(--color-accent);border-radius:2px;transition:width 0.3s ease}
+
+/* Thinking block */
+.thinking-block{margin:4px 0 8px 36px;font-size:12px;color:var(--color-text-tertiary,#999)}
+.thinking-block summary{cursor:pointer;user-select:none;font-style:italic}
+.thinking-block .thinking-content{padding:6px 0;white-space:pre-wrap;font-family:var(--font-mono);font-size:11px;line-height:1.5;max-height:300px;overflow-y:auto}
+
+/* Context usage indicator */
+.context-usage{display:inline-block;margin-left:12px;font-size:11px;color:var(--color-text-tertiary);font-family:var(--font-mono);vertical-align:middle}
+.context-usage.warn{color:var(--color-warning)}
+.context-usage.danger{color:var(--color-error);font-weight:600}

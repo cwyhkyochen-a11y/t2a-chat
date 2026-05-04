@@ -60,6 +60,12 @@ async function handle(req, res, ctx) {
     return handleCompactConversation(req, res, ctx, Number(compactMatch[1]));
   }
 
+  // GET /api/chat/conversations/:id/context-usage
+  const usageMatch = url.match(/^\/api\/chat\/conversations\/(\d+)\/context-usage$/);
+  if (usageMatch && method === 'GET') {
+    return handleContextUsage(req, res, ctx, Number(usageMatch[1]));
+  }
+
   // GET /api/chat/agent-config
   if (url === '/api/chat/agent-config' && method === 'GET') {
     return handleGetAgentConfig(req, res, ctx);
@@ -239,6 +245,33 @@ async function handleCompactConversation(req, res, ctx, id) {
   }
 }
 
+// GET /api/chat/conversations/:id/context-usage — 返回 session 的 context 使用量
+async function handleContextUsage(req, res, ctx, id) {
+  const { resolveUser, dbChat, sessionPool } = ctx;
+  try {
+    const user = await resolveUser(req);
+    if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
+    const conv = dbChat.getConversation(id);
+    if (!conv) return jsonRes(res, 404, { error: '对话不存在' });
+    if (conv.user_id !== user.id) return jsonRes(res, 403, { error: '无权访问此对话' });
+    if (!sessionPool) return jsonRes(res, 500, { error: 'sessionPool 不可用' });
+
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['host'] || 'localhost';
+    const baseUrl = proto + '://' + host;
+
+    const session = sessionPool.getOrCreateSession(String(id), user.id, baseUrl);
+    if (typeof session.getContextUsage !== 'function') {
+      return jsonRes(res, 200, { used: 0, max: 0, warning: 0 });
+    }
+    const usage = await session.getContextUsage();
+    return jsonRes(res, 200, usage || { used: 0, max: 0, warning: 0 });
+  } catch (err) {
+    console.error('[chat] context-usage error:', err);
+    return jsonRes(res, 500, { error: err.message });
+  }
+}
+
 module.exports = {
   handle,
   handleGetConversations,
@@ -246,6 +279,7 @@ module.exports = {
   handleGetConversationDetail,
   handleDeleteConversation,
   handleCompactConversation,
+  handleContextUsage,
   handleGetAgentConfig,
   handleUpdateAgentConfig,
   handleGetSettings,

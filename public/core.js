@@ -38,6 +38,7 @@
       if (t) { t.classList.add('done'); if (!this.content) this.streamDiv.remove(); }
       this.streamDiv = null;
       this.content = '';
+      this._thinkingDetails = null;
     },
   };
 
@@ -97,6 +98,8 @@
       onConversationCreated: handleConversationCreated,
       onConnectionState: handleConnectionState,
       onInterrupt: handleWsInterrupt,
+      onInterlude: handleInterlude,
+      onThinking: handleThinking,
       onSync: function () {},
     });
     wsManager.connect();
@@ -153,14 +156,41 @@
     setStreamingUi(false);
     if (data && data.conversation_id) currentConvId = data.conversation_id;
     loadConversations();
+    if (currentConvId) loadContextUsage(currentConvId);
   }
 
   function handleText(data) {
     dom.hideThinking();
+    // Close thinking block when first text delta arrives
+    if (streamCtx._thinkingDetails) {
+      streamCtx._thinkingDetails.removeAttribute('open');
+      streamCtx._thinkingDetails = null;
+    }
     streamCtx.ensureSegment();
     streamCtx.content += (data.delta || '');
     const t = streamCtx.streamDiv.querySelector('.stream-text');
     if (t) t.innerHTML = dom.renderMd(streamCtx.content);
+    dom.scrollToBottom();
+  }
+
+  function handleInterlude(data) {
+    dom.appendNoticeMsg(data.text || '');
+    dom.scrollToBottom();
+  }
+
+  function handleThinking(data) {
+    dom.hideThinking();
+    const container = dom.ensureContainer();
+    if (!streamCtx._thinkingDetails) {
+      const details = document.createElement('details');
+      details.className = 'thinking-block';
+      details.setAttribute('open', '');
+      details.innerHTML = '<summary>\ud83d\udcad Thinking...</summary><div class="thinking-content"></div>';
+      container.appendChild(details);
+      streamCtx._thinkingDetails = details;
+    }
+    const content = streamCtx._thinkingDetails.querySelector('.thinking-content');
+    if (content) content.textContent += (data.delta || '');
     dom.scrollToBottom();
   }
 
@@ -267,6 +297,7 @@
     loadConversations();
     await loadMessages(id);
     if (wsManager && wsManager.authenticated) wsManager.subscribe(id, null);
+    loadContextUsage(id);
   }
 
   async function deleteConversation(id) {
@@ -420,6 +451,33 @@
     });
     const msgInput = document.getElementById('msgInput');
     if (msgInput) window._t2aCommands.init(msgInput);
+  }
+
+  // ---- Context usage ----
+  async function loadContextUsage(convId) {
+    const el = document.getElementById('contextUsage');
+    if (!el) return;
+    try {
+      const res = await fetch(API_BASE + '/conversations/' + convId + '/context-usage', { credentials: 'include' });
+      if (!res.ok) { el.textContent = ''; return; }
+      const data = await res.json();
+      const used = data.used || 0;
+      const max = data.max || 0;
+      const warning = data.warning || 0;
+      if (!max) { el.textContent = ''; return; }
+      const pct = used / max;
+      const usedK = (used / 1000).toFixed(1) + 'k';
+      const maxK = (max / 1000).toFixed(1) + 'k';
+      el.textContent = usedK + ' / ' + maxK;
+      el.className = 'context-usage';
+      if (pct > 0.9) {
+        el.classList.add('danger');
+      } else if (used > warning && warning > 0) {
+        el.classList.add('warn');
+      }
+    } catch (e) {
+      el.textContent = '';
+    }
   }
 
   // ---- 暴露 ----

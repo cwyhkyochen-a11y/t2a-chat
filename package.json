@@ -8,9 +8,11 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
-    "@t2a/core": "^0.6.1",
+    "@t2a/core": "^0.6.2",
     "better-sqlite3": "^11.0.0",
     "ws": "^8.16.0"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

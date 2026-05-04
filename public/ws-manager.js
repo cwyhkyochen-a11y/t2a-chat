@@ -17,6 +17,8 @@ class ChatWSManager {
     this.onSync = options.onSync || (() => {});
     this.onInterrupt = options.onInterrupt || (() => {});
     this.onToolError = options.onToolError || (() => {});
+    this.onInterlude = options.onInterlude || (() => {});
+    this.onThinking = options.onThinking || (() => {});
 
     this.ws = null;
     this.authenticated = false;
@@ -135,6 +137,12 @@ class ChatWSManager {
         break;
       case 'interrupt':
         this.onInterrupt(msg);
+        break;
+      case 'interlude':
+        this.onInterlude(msg);
+        break;
+      case 'thinking':
+        this.onThinking(msg);
         break;
       case 'sync':
         this.onSync(msg);
