@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  if (!window._t2aSlots || !window._t2aTaskRenderer || !window._t2aCore) {
+  if (!window._t2aSlots || !window._t2aTaskRenderer || !window._t2aDom || !window._t2aCore) {
     console.error('[t2aChat] 模块未就绪，请检查 script 加载顺序');
     return;
   }
