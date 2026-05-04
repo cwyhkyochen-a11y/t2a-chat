@@ -13,6 +13,7 @@
   let isStreaming = false;
   let wsManager = null;
   let _modelsCache = null;
+  let _selectEpoch = 0;
 
   const dom = window._t2aDom;
 
@@ -295,12 +296,17 @@
   }
 
   async function selectConversation(id) {
+    const myEpoch = ++_selectEpoch;
     currentConvId = id;
     loadConversations();
+    // emit switching 事件，adapter 可以做清理 + 显示 loading
+    if (window._t2aSlots) window._t2aSlots.emit('conversation:switching', { id: id });
+    // 立即显示消息区 loading
+    dom.showMessagesLoading();
     // subscribe 提前：不依赖 messages 已加载，currentConvId 已赋值
     if (wsManager && wsManager.authenticated) wsManager.subscribe(id, null);
     // messages 与 context-usage 并行拉取
-    await Promise.all([loadMessages(id), loadContextUsage(id)]);
+    await Promise.all([loadMessages(id, myEpoch), loadContextUsage(id, myEpoch)]);
   }
 
   async function deleteConversation(id) {
@@ -313,11 +319,14 @@
     loadConversations();
   }
 
-  async function loadMessages(convId) {
+  async function loadMessages(convId, epoch) {
     try {
       const res = await fetch(API_BASE + '/conversations/' + convId, { credentials: 'include' });
-      if (!res.ok) return;
+      if (!res.ok) { dom.hideMessagesLoading(); return; }
       const data = await res.json();
+      // 竞态校验：若 epoch 已过期，静默丢弃
+      if (epoch !== undefined && epoch !== _selectEpoch) return;
+      dom.hideMessagesLoading();
       document.getElementById('chatTitle').textContent = (data.conversation && data.conversation.title) || 'Chat';
       document.getElementById('messages').innerHTML = '';
       if (!data.messages || !data.messages.length) { dom.showWelcome(); return; }
@@ -325,7 +334,11 @@
       dom.scrollToBottom();
       // v0.2.0 P2: adapter 钩子，可基于历史回放 tool_calls 还原任务状态
       if (window._t2aSlots) window._t2aSlots.emit('history:loaded', { conversationId: convId, messages: data.messages, raw: data });
-    } catch (e) { console.error('loadMessages error:', e); dom.toast('加载消息失败', 'warning'); }
+    } catch (e) {
+      if (epoch !== undefined && epoch !== _selectEpoch) return;
+      dom.hideMessagesLoading();
+      console.error('loadMessages error:', e); dom.toast('加载消息失败', 'warning');
+    }
   }
 
   // ---- 发送 ----
@@ -457,13 +470,15 @@
   }
 
   // ---- Context usage ----
-  async function loadContextUsage(convId) {
+  async function loadContextUsage(convId, epoch) {
     const el = document.getElementById('contextUsage');
     if (!el) return;
     try {
       const res = await fetch(API_BASE + '/conversations/' + convId + '/context-usage', { credentials: 'include' });
       if (!res.ok) { el.textContent = ''; return; }
       const data = await res.json();
+      // 竞态校验
+      if (epoch !== undefined && epoch !== _selectEpoch) return;
       const used = data.used || 0;
       const max = data.max || 0;
       const warning = data.warning || 0;

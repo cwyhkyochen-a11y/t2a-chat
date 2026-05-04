@@ -163,6 +163,20 @@
     if (dot) dot.remove();
   }
 
+  // ---- 消息区加载占位 ----
+  function showMessagesLoading() {
+    const container = document.getElementById('messages');
+    if (!container) return;
+    container.innerHTML = '<div class="messages-loading"><div class="messages-loading-spinner"></div><span>Loading…</span></div>';
+  }
+
+  function hideMessagesLoading() {
+    const container = document.getElementById('messages');
+    if (!container) return;
+    const node = container.querySelector('.messages-loading');
+    if (node) node.remove();
+  }
+
   // ---- 历史渲染 ----
   function renderHistory(messages) {
     var realContainer = document.getElementById('messages');
@@ -248,6 +262,7 @@
     appendUserBubble, appendAssistantBubble, appendInterludeMsg, appendToolMsg,
     appendSystemEventMsg, appendNoticeMsg,
     showThinking, hideThinking,
+    showMessagesLoading, hideMessagesLoading,
     renderHistory, showWelcome,
     toast,
   };

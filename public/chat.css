@@ -272,3 +272,9 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .context-usage{display:inline-block;margin-left:12px;font-size:11px;color:var(--color-text-tertiary);font-family:var(--font-mono);vertical-align:middle}
 .context-usage.warn{color:var(--color-warning)}
 .context-usage.danger{color:var(--color-error);font-weight:600}
+
+/* Messages loading placeholder */
+.messages-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:80px 20px;animation:fadeIn 0.15s ease}
+.messages-loading span{font-size:13px;color:var(--color-text-tertiary)}
+.messages-loading-spinner{width:20px;height:20px;border:2px solid var(--color-border);border-top-color:var(--color-text-tertiary);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
