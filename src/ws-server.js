@@ -80,6 +80,10 @@ function initWebSocket(server, deps) {
     ws.on('message', (raw) => {
       let msg;
       try { msg = JSON.parse(raw.toString()); } catch { return; }
+      // diag: 记录关键消息（跳过 pong 防刷屏）
+      if (msg.type !== 'pong') {
+        console.log('[ws] recv', { type: msg.type, convId: msg.conversation_id || ws.conversationId, user: ws.userId });
+      }
       handleClientMessage(ws, msg);
     });
 
@@ -230,11 +234,23 @@ function handleSend(ws, msg) {
   // turn_start
   safeSend(ws, { type: 'turn_start' });
 
+  const t0 = Date.now();
+  console.log('[ws] llm_call_start', { convId, user: ws.userId, hasImage: !!imageUrl });
+
+  // 诊断：超过 30s 还没有 turn_end 则告警
+  const longWaitTimer = setTimeout(() => {
+    console.warn('[ws] long_wait: no turn_end after 30s', { convId, elapsedMs: Date.now() - t0 });
+  }, 30000);
+
   session.sendUserMessage(content)
     .then(() => {
+      clearTimeout(longWaitTimer);
+      console.log('[ws] llm_call_end', { convId, durationMs: Date.now() - t0, ok: true });
       safeSend(ws, { type: 'turn_end', conversation_id: convId });
     })
     .catch(err => {
+      clearTimeout(longWaitTimer);
+      console.error('[ws] llm_call_end', { convId, durationMs: Date.now() - t0, ok: false, error: err && err.message || String(err) });
       safeSend(ws, { type: 'error', error: err && err.message || String(err) });
       safeSend(ws, { type: 'turn_end', conversation_id: convId });
     });

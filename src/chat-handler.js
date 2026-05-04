@@ -14,6 +14,7 @@ async function handleChat(req, res, ctx) {
     if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
     const body = JSON.parse((await readBody(req)).toString());
     const { conversation_id, message, image_url } = body;
+    console.log('[chat-handler] POST /api/chat', { userId: user.id, convId: conversation_id, hasMsg: !!message, hasImage: !!image_url });
     if (!message && !image_url) return jsonRes(res, 400, { error: 'message or image_url is required' });
     if (!dbConfig.getAgentConfig()) return jsonRes(res, 500, { error: 'Agent 未配置，请在管理后台配置' });
 

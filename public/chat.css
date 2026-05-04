@@ -205,7 +205,11 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .input-slot-buttons{display:flex;gap:4px;align-items:center}
 .input-slot-buttons .slot-btn{background:none;border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--color-text-secondary);font-size:12px;display:flex;align-items:center;gap:4px;transition:border-color var(--transition),color var(--transition)}
 .input-slot-buttons .slot-btn:hover{border-color:var(--color-border-focus);color:var(--color-text)}
-.sidebar-links{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.sidebar-links{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--color-border);overflow-x:auto;flex-wrap:nowrap}
+.sidebar-links a{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:6px;font-size:13px;color:var(--color-text-secondary,#6b7280);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s}
+.sidebar-links a:hover{background:var(--color-hover,#f3f4f6);color:var(--color-text,#111827)}
+.sidebar-links a.active{background:var(--color-active,#e5e7eb);color:var(--color-text,#111827);font-weight:500}
+.sidebar-links a svg{width:14px;height:14px;flex-shrink:0}
 .welcome-suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:center}
 .welcome-suggestions .suggestion{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;transition:border-color var(--transition),background var(--transition);color:var(--color-text-secondary)}
 .welcome-suggestions .suggestion:hover{border-color:var(--color-border-focus);background:var(--color-accent-bg);color:var(--color-text)}

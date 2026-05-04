@@ -117,12 +117,23 @@
     if (!container) return;
     const items = _slots['sidebar-links'];
     container.innerHTML = '';
+    const currentPath = (location.pathname || '').replace(/\/+$/, '') || '/';
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const a = document.createElement('a');
-      a.className = 'mode-link';
-      a.href = item.url || '#';
-      a.innerHTML = (item.icon || '') + ' ' + _esc(item.label || '');
+      const url = item.url || '#';
+      a.href = url;
+      // 判断是否是当前页：同路径或 './'/'.' 与当前叠合
+      let isActive = false;
+      try {
+        const resolved = new URL(url, location.href);
+        const linkPath = (resolved.pathname || '').replace(/\/+$/, '') || '/';
+        if (linkPath === currentPath) isActive = true;
+      } catch {}
+      if (isActive) a.classList.add('active');
+      const iconHtml = item.icon || '';
+      const labelHtml = _esc(item.label || '');
+      a.innerHTML = iconHtml + (iconHtml ? ' ' : '') + '<span>' + labelHtml + '</span>';
       container.appendChild(a);
     }
   }

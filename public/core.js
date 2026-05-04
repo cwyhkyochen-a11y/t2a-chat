@@ -404,8 +404,19 @@
   // ---- 自动登录 + 事件绑定 ----
   // v0.2.0 P2: cookie-based auth，启动时直接尝试连接 WS。
   // 如果 cookie 还在 → upgrade 鉴权通过 → auth_ok；否则 401 close → 显示登录浮层。
+  // FIX: 没有保存的密码且没有 session cookie 时，不发起 WS 连接（避免无谓的 401 → 弹错误）。
+  // 注意：cookie 是 HttpOnly，前端读不到；这里以 localStorage pw 作为是否曾经登录的近似信号。
   (function () {
-    connectWebSocket(getPw() || '');
+    const savedPw = getPw();
+    if (savedPw) {
+      connectWebSocket(savedPw);
+    } else {
+      // 没有存储的密码，直接显示登录浮层，不发 WS 请求
+      const overlay = document.getElementById('loginOverlay');
+      const app = document.getElementById('app');
+      if (overlay) overlay.classList.remove('hidden');
+      if (app) app.style.display = 'none';
+    }
   })();
 
   document.getElementById('loginPass').addEventListener('keydown', function (e) {
