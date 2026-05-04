@@ -48,9 +48,12 @@ function createChatApp(options) {
   const chatRoutes = require('./chat-routes');
   const adminRoutes = require('./admin-routes');
 
+  let _attached = false;
+
   function attachToServer(server) {
     // WebSocket
     const wss = initWebSocket(server, { db, dbChat, dbConfig, dbChatLLM, auth, sessionPool, basePath });
+    _attached = true;
 
     return {
       wss,
@@ -59,6 +62,7 @@ function createChatApp(options) {
         chatHandler, chatRoutes, adminRoutes,
         db, dbChat, dbConfig, dbChatLLM, sessionPool, tools,
       }),
+      pushToConversation,
     };
   }
 
@@ -68,9 +72,17 @@ function createChatApp(options) {
     return session.pushSystemEvent(eventInput);
   }
 
+  function pushToConversationGuarded(conversationId, message) {
+    if (!_attached) {
+      throw new Error('[t2a-chat] pushToConversation called before attachToServer()');
+    }
+    return pushToConversation(conversationId, message);
+  }
+
   return {
     attachToServer,
     pushSystemEvent,
+    pushToConversation: pushToConversationGuarded,
     getSessionPool: () => sessionPool,
     // 暴露给宿主的数据层
     db: { chat: dbChat, llm: dbChatLLM, config: dbConfig },
