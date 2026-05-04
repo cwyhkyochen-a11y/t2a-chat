@@ -14,6 +14,7 @@
   let wsManager = null;
   let _modelsCache = null;
   let _selectEpoch = 0;
+  let _selectAbortController = null;
 
   const dom = window._t2aDom;
 
@@ -297,6 +298,12 @@
 
   async function selectConversation(id) {
     const myEpoch = ++_selectEpoch;
+    // 中断上一次选择的 in-flight fetch，释放浏览器 connection
+    if (_selectAbortController) {
+      try { _selectAbortController.abort(); } catch (e) {}
+    }
+    _selectAbortController = new AbortController();
+    const signal = _selectAbortController.signal;
     currentConvId = id;
     // 立即更新选中态（不等 loadConversations fetch 回来）
     document.querySelectorAll('.conv-item').forEach(function (el) {
@@ -310,7 +317,7 @@
     // subscribe 提前：不依赖 messages 已加载，currentConvId 已赋值
     if (wsManager && wsManager.authenticated) wsManager.subscribe(id, null);
     // messages 与 context-usage 并行拉取
-    await Promise.all([loadMessages(id, myEpoch), loadContextUsage(id, myEpoch)]);
+    await Promise.all([loadMessages(id, myEpoch, signal), loadContextUsage(id, myEpoch, signal)]);
   }
 
   async function deleteConversation(id) {
@@ -323,9 +330,9 @@
     loadConversations();
   }
 
-  async function loadMessages(convId, epoch) {
+  async function loadMessages(convId, epoch, signal) {
     try {
-      const res = await fetch(API_BASE + '/conversations/' + convId, { credentials: 'include' });
+      const res = await fetch(API_BASE + '/conversations/' + convId, { credentials: 'include', signal: signal });
       if (!res.ok) { dom.hideMessagesLoading(); return; }
       const data = await res.json();
       // 竞态校验：若 epoch 已过期，静默丢弃
@@ -339,6 +346,8 @@
       // v0.2.0 P2: adapter 钩子，可基于历史回放 tool_calls 还原任务状态
       if (window._t2aSlots) window._t2aSlots.emit('history:loaded', { conversationId: convId, messages: data.messages, raw: data });
     } catch (e) {
+      // AbortError 静默丢弃（被主动 abort）
+      if (e && e.name === 'AbortError') return;
       if (epoch !== undefined && epoch !== _selectEpoch) return;
       dom.hideMessagesLoading();
       console.error('loadMessages error:', e); dom.toast('加载消息失败', 'warning');
@@ -474,11 +483,11 @@
   }
 
   // ---- Context usage ----
-  async function loadContextUsage(convId, epoch) {
+  async function loadContextUsage(convId, epoch, signal) {
     const el = document.getElementById('contextUsage');
     if (!el) return;
     try {
-      const res = await fetch(API_BASE + '/conversations/' + convId + '/context-usage', { credentials: 'include' });
+      const res = await fetch(API_BASE + '/conversations/' + convId + '/context-usage', { credentials: 'include', signal: signal });
       if (!res.ok) { el.textContent = ''; return; }
       const data = await res.json();
       // 竞态校验
@@ -498,6 +507,7 @@
         el.classList.add('warn');
       }
     } catch (e) {
+      if (e && e.name === 'AbortError') return;
       el.textContent = '';
     }
   }
