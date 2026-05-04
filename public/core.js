@@ -297,9 +297,10 @@
   async function selectConversation(id) {
     currentConvId = id;
     loadConversations();
-    await loadMessages(id);
+    // subscribe 提前：不依赖 messages 已加载，currentConvId 已赋值
     if (wsManager && wsManager.authenticated) wsManager.subscribe(id, null);
-    loadContextUsage(id);
+    // messages 与 context-usage 并行拉取
+    await Promise.all([loadMessages(id), loadContextUsage(id)]);
   }
 
   async function deleteConversation(id) {

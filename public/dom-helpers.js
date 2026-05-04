@@ -38,7 +38,10 @@
   }
 
   // ---- 容器管理 ----
+  var _renderBatchTarget = null;
+
   function ensureContainer() {
+    if (_renderBatchTarget) return _renderBatchTarget;
     var container = document.getElementById('messages');
     var welcome = container.querySelector('.welcome');
     if (welcome) welcome.remove();
@@ -162,36 +165,46 @@
 
   // ---- 历史渲染 ----
   function renderHistory(messages) {
-    for (var i = 0; i < messages.length; i++) {
-      var m = messages[i];
-      if (m.role === 'user') {
-        appendUserBubble(m.content || '');
-      } else if (m.role === 'assistant') {
-        if (m.content) appendAssistantBubble(m.content, { interrupted: m.interrupted });
-        if (m.tool_calls) {
-          try {
-            var tcs = JSON.parse(m.tool_calls);
-            for (var j = 0; j < tcs.length; j++) {
-              var tc = tcs[j];
-              var fn = tc.function && tc.function.name;
-              var args = {};
-              try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) {}
-              appendToolMsg({ id: tc.id, name: fn, args: args, status: 'done' });
-            }
-          } catch (e) {}
+    var realContainer = document.getElementById('messages');
+    var welcome = realContainer.querySelector('.welcome');
+    if (welcome) welcome.remove();
+    var fragment = document.createDocumentFragment();
+    _renderBatchTarget = fragment;
+    try {
+      for (var i = 0; i < messages.length; i++) {
+        var m = messages[i];
+        if (m.role === 'user') {
+          appendUserBubble(m.content || '');
+        } else if (m.role === 'assistant') {
+          if (m.content) appendAssistantBubble(m.content, { interrupted: m.interrupted });
+          if (m.tool_calls) {
+            try {
+              var tcs = JSON.parse(m.tool_calls);
+              for (var j = 0; j < tcs.length; j++) {
+                var tc = tcs[j];
+                var fn = tc.function && tc.function.name;
+                var args = {};
+                try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) {}
+                appendToolMsg({ id: tc.id, name: fn, args: args, status: 'done' });
+              }
+            } catch (e) {}
+          }
+        } else if (m.role === 'interlude') {
+          appendInterludeMsg(m.content || '');
+        } else if (m.role === 'notice') {
+          appendNoticeMsg(m.content || '');
+        } else if (m.role === 'system_event') {
+          var payload = null;
+          try { payload = JSON.parse(m.event_payload || 'null'); } catch (e) {}
+          var source = m.event_source || 'system';
+          var summary = payload && (payload.message || payload.text) || '';
+          appendSystemEventMsg(source, summary);
         }
-      } else if (m.role === 'interlude') {
-        appendInterludeMsg(m.content || '');
-      } else if (m.role === 'notice') {
-        appendNoticeMsg(m.content || '');
-      } else if (m.role === 'system_event') {
-        var payload = null;
-        try { payload = JSON.parse(m.event_payload || 'null'); } catch (e) {}
-        var source = m.event_source || 'system';
-        var summary = payload && (payload.message || payload.text) || '';
-        appendSystemEventMsg(source, summary);
       }
+    } finally {
+      _renderBatchTarget = null;
     }
+    realContainer.appendChild(fragment);
   }
 
   // ---- 欢迎页 ----
