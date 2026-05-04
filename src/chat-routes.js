@@ -54,6 +54,12 @@ async function handle(req, res, ctx) {
     return chatHandler.handleInterrupt(req, res, ctx, Number(interruptMatch[1]));
   }
 
+  // POST /api/chat/conversations/:id/compact
+  const compactMatch = url.match(/^\/api\/chat\/conversations\/(\d+)\/compact$/);
+  if (compactMatch && method === 'POST') {
+    return handleCompactConversation(req, res, ctx, Number(compactMatch[1]));
+  }
+
   // GET /api/chat/agent-config
   if (url === '/api/chat/agent-config' && method === 'GET') {
     return handleGetAgentConfig(req, res, ctx);
@@ -203,12 +209,43 @@ async function handleUpdateSettings(req, res, ctx) {
   return jsonRes(res, 200, { ok: true });
 }
 
+// POST /api/chat/conversations/:id/compact — 压缩会话历史
+async function handleCompactConversation(req, res, ctx, id) {
+  const { resolveUser, dbChat, sessionPool } = ctx;
+  try {
+    const user = await resolveUser(req);
+    if (!user) return jsonRes(res, 401, { error: 'Unauthorized' });
+    const conv = dbChat.getConversation(id);
+    if (!conv) return jsonRes(res, 404, { error: '对话不存在' });
+    if (conv.user_id !== user.id) return jsonRes(res, 403, { error: '无权访问此对话' });
+    if (!sessionPool) return jsonRes(res, 500, { error: 'sessionPool 不可用' });
+
+    let body = {};
+    try { body = JSON.parse((await readBody(req)).toString() || '{}'); } catch (e) {}
+    const keepLastN = Number.isFinite(body.keepLastN) ? body.keepLastN : 10;
+
+    const session = sessionPool.peek(String(id));
+    if (!session) {
+      return jsonRes(res, 400, { error: 'session 未初始化，请先发起一轮对话' });
+    }
+    if (typeof session.compact !== 'function') {
+      return jsonRes(res, 500, { error: 'session.compact 未实现' });
+    }
+    await session.compact({ keepLastN });
+    return jsonRes(res, 200, { ok: true });
+  } catch (err) {
+    console.error('[chat] compact error:', err);
+    return jsonRes(res, 500, { error: err.message });
+  }
+}
+
 module.exports = {
   handle,
   handleGetConversations,
   handleCreateConversation,
   handleGetConversationDetail,
   handleDeleteConversation,
+  handleCompactConversation,
   handleGetAgentConfig,
   handleUpdateAgentConfig,
   handleGetSettings,

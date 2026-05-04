@@ -38,6 +38,15 @@
     off: slots.off,
     emit: slots.emit,
 
+    // Slash command 注册
+    registerCommand: function (cmd) {
+      if (window._t2aCommands) window._t2aCommands.registerCommand(cmd);
+      else console.warn('[t2aChat] commands 模块未就绪');
+    },
+    listCommands: function () {
+      return window._t2aCommands ? window._t2aCommands.listCommands() : [];
+    },
+
     // 暴露给 inline onclick 用的内部方法（不走全局 onload）
     _internal: {
       selectConversation: core.selectConversation,

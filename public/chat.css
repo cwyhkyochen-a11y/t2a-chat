@@ -113,7 +113,16 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 
 /* Input area */
 .input-area{padding:16px 20px;border-top:1px solid var(--color-border)}
+.input-wrap{position:relative}
 .input-row{display:flex;gap:10px;align-items:flex-end}
+
+/* Command palette */
+.cmd-palette{position:absolute;bottom:100%;left:0;right:0;margin-bottom:8px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-height:240px;overflow-y:auto;z-index:50}
+.cmd-palette.hidden{display:none}
+.cmd-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;transition:background var(--transition)}
+.cmd-item:hover,.cmd-item.active{background:var(--color-bg-hover)}
+.cmd-name{font-family:var(--font-mono);color:var(--color-text);font-weight:500}
+.cmd-desc{color:var(--color-text-secondary);font-size:12px;margin-left:8px}
 .input-row textarea{flex:1;background:var(--color-bg-secondary);border:1px solid var(--color-border);color:var(--color-text);padding:10px 14px;border-radius:8px;font-size:14px;font-family:var(--font);resize:none;min-height:40px;max-height:120px;line-height:1.5;transition:border-color var(--transition)}
 .input-row textarea:focus{outline:none;border-color:var(--color-border-focus);box-shadow:0 0 0 2px rgba(46,170,220,0.15)}
 .input-row textarea::placeholder{color:var(--color-text-placeholder)}
@@ -163,6 +172,14 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .btn-primary:hover{opacity:0.85}
 .btn-secondary{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-family:var(--font);transition:all var(--transition)}
 .btn-secondary:hover{border-color:var(--color-error);color:var(--color-error)}
+
+/* Config panels in settings modal */
+.config-panel{margin-top:16px;padding-top:16px;border-top:1px solid var(--color-border)}
+.config-panel h4{font-size:13px;font-weight:500;color:var(--color-text);margin:0 0 10px}
+.config-fields{display:flex;flex-direction:column;gap:10px}
+.config-fields label{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px}
+.config-fields select,.config-fields input{width:100%;padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;font-size:13px;background:var(--color-bg);color:var(--color-text);font-family:var(--font)}
+.config-fields select:focus,.config-fields input:focus{outline:none;border-color:var(--color-border-focus)}
 
 /* WebSocket banner */
 .ws-banner{position:fixed;top:0;left:0;right:0;padding:6px 16px;font-size:12px;text-align:center;z-index:1000;transition:all 0.3s;display:none}

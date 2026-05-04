@@ -320,11 +320,16 @@
   }
 
   // ---- 设置 ----
-  function showSettings() { document.getElementById('settingsPass').value = getPw() || ''; document.getElementById('settingsModal').classList.add('active'); }
+  function showSettings() {
+    document.getElementById('settingsPass').value = getPw() || '';
+    document.getElementById('settingsModal').classList.add('active');
+    if (window._t2aSlots && window._t2aSlots.loadConfigPanels) window._t2aSlots.loadConfigPanels();
+  }
   function hideSettings() { document.getElementById('settingsModal').classList.remove('active'); }
-  function saveSettings() {
+  async function saveSettings() {
     var pw = document.getElementById('settingsPass').value.trim();
     if (pw) { setPw(pw); if (wsManager) wsManager.disconnect(); connectWebSocket(pw); }
+    if (window._t2aSlots && window._t2aSlots.saveConfigPanels) await window._t2aSlots.saveConfigPanels();
     hideSettings(); dom.toast('Settings saved', 'success');
   }
   function logout() {
@@ -381,6 +386,42 @@
     return null;
   }
 
+  // ---- Slash commands ----
+  function _registerDefaultCommands() {
+    if (!window._t2aCommands) return;
+    window._t2aCommands.registerCommand({
+      name: '/compact',
+      description: '压缩当前会话历史，保留最近几轮',
+      handler: async function () {
+        if (!currentConvId) { dom.toast('请先选择或发起一个对话', 'warning'); return; }
+        if (isStreaming) { dom.toast('流式进行中，请稍候', 'warning'); return; }
+        try {
+          dom.toast('压缩中…', 'info', 1500);
+          const res = await fetch(API_BASE + '/conversations/' + currentConvId + '/compact', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keepLastN: 10 }),
+          });
+          if (res.ok) {
+            dom.toast('已压缩对话历史', 'success');
+            await loadMessages(currentConvId);
+          } else {
+            let msg = '压缩失败';
+            try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) {}
+            dom.toast(msg, 'error');
+          }
+        } catch (e) { dom.toast('网络错误', 'error'); }
+      },
+    });
+    window._t2aCommands.registerCommand({
+      name: '/clear',
+      description: '新建一个对话',
+      handler: async function () { newConversation(); },
+    });
+    const msgInput = document.getElementById('msgInput');
+    if (msgInput) window._t2aCommands.init(msgInput);
+  }
+
   // ---- 暴露 ----
   window._t2aCore = {
     get currentConvId() { return currentConvId; },
@@ -402,6 +443,9 @@
   };
 
   // ---- 自动登录 + 事件绑定 ----
+  // 初始化默认 slash commands
+  _registerDefaultCommands();
+
   // v0.2.0 P2: cookie-based auth，启动时直接尝试连接 WS。
   // 如果 cookie 还在 → upgrade 鉴权通过 → auth_ok；否则 401 close → 显示登录浮层。
   // FIX: 没有保存的密码且没有 session cookie 时，不发起 WS 连接（避免无谓的 401 → 弹错误）。
