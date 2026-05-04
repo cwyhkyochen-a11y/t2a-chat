@@ -17,10 +17,52 @@
     return d.innerHTML;
   }
 
+  // ---- Form 块管理（B1：识别 + placeholder + hydrate） ----
+  var _pendingForms = new Map(); // formId -> { parsed, raw }
+  var _formIdCounter = 0;
+  var _PENDING_FORMS_MAX = 100;
+
+  function _genFormId() {
+    _formIdCounter++;
+    return 'form_' + Date.now() + '_' + _formIdCounter;
+  }
+
+  function _rememberForm(formId, parsed, raw) {
+    if (_pendingForms.size >= _PENDING_FORMS_MAX) {
+      // FIFO 淘汰最老的一条
+      var firstKey = _pendingForms.keys().next().value;
+      if (firstKey !== undefined) _pendingForms.delete(firstKey);
+    }
+    _pendingForms.set(formId, { parsed: parsed, raw: raw });
+  }
+
+  function getFormParsed(formId) {
+    var entry = _pendingForms.get(formId);
+    return entry ? entry.parsed : null;
+  }
+
   // ---- 极简 Markdown ----
   function renderMd(text) {
     if (!text) return '';
-    var html = esc(text);
+
+    // Step 1: 先抽出 ```form 块，存到 _pendingForms，原文替换为 sentinel token
+    // 必须在 esc 之前做，否则 form 内的 { " 会被转义
+    var sentinels = []; // { token, formId }
+    var working = text.replace(/```form\s*\n([\s\S]*?)```/g, function (_full, body) {
+      var formId = _genFormId();
+      var parsed = { fields: [], submitLabel: '提交', _error: 'parser unavailable' };
+      if (window._t2aFormParser && typeof window._t2aFormParser.parseFormBlock === 'function') {
+        try { parsed = window._t2aFormParser.parseFormBlock(body); } catch (e) {
+          parsed = { fields: [], submitLabel: '提交', _error: (e && e.message) || 'parse error' };
+        }
+      }
+      _rememberForm(formId, parsed, body);
+      var token = '\u0001FORM_' + formId + '\u0001';
+      sentinels.push({ token: token, formId: formId });
+      return token;
+    });
+
+    var html = esc(working);
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -34,7 +76,43 @@
     });
     html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
-    return '<p>' + html + '</p>';
+    html = '<p>' + html + '</p>';
+
+    // Step 3: sentinel -> placeholder div
+    for (var i = 0; i < sentinels.length; i++) {
+      var s = sentinels[i];
+      // sentinel 含特殊字符，简单全局 split-join 替换
+      html = html.split(s.token).join('<div data-form-placeholder="' + s.formId + '"></div>');
+    }
+    return html;
+  }
+
+  // ---- Form Hydrate：把 placeholder 替换为真实 DOM ----
+  function hydrateFormPlaceholders(rootEl) {
+    if (!rootEl || typeof rootEl.querySelectorAll !== 'function') return;
+    var placeholders = rootEl.querySelectorAll('[data-form-placeholder]');
+    for (var i = 0; i < placeholders.length; i++) {
+      var ph = placeholders[i];
+      var formId = ph.getAttribute('data-form-placeholder');
+      var entry = _pendingForms.get(formId);
+      if (!entry) {
+        // 找不到 parsed（页面刷新后？）— 移除占位符避免空 div
+        ph.parentNode && ph.parentNode.removeChild(ph);
+        continue;
+      }
+      var node = null;
+      if (window._t2aFormRenderer && typeof window._t2aFormRenderer.render === 'function') {
+        try { node = window._t2aFormRenderer.render(entry.parsed, formId); } catch (e) { node = null; }
+      }
+      if (!node) {
+        // Fallback：renderer 不存在或抛错 → 显示原始 form 块文本
+        node = document.createElement('pre');
+        var code = document.createElement('code');
+        code.textContent = '```form\n' + (entry.raw || '') + '```';
+        node.appendChild(code);
+      }
+      ph.parentNode && ph.parentNode.replaceChild(node, ph);
+    }
   }
 
   // ---- 容器管理 ----
@@ -68,6 +146,7 @@
     div.className = 'message assistant';
     var stopTag = opts && opts.interrupted ? '<span class="bubble-stopped-tag">（已停止）</span>' : '';
     div.innerHTML = '<div class="avatar">' + IC_BOT + '</div><div><div class="bubble">' + renderMd(content) + stopTag + '</div></div>';
+    hydrateFormPlaceholders(div);
     container.appendChild(div);
   }
 
@@ -219,6 +298,64 @@
       _renderBatchTarget = null;
     }
     realContainer.appendChild(fragment);
+    // append 完成后再 hydrate 真实容器里的占位符（fragment 内 hydrate 也行，但放真实容器更稳）
+    hydrateFormPlaceholders(realContainer);
+    // 历史回放：推断 form 状态（已提交 / 被绕过）
+    inferFormStates(messages, realContainer);
+  }
+
+  // 历史回放时推断 form block 状态（方案 B：看后续 user message 是否是表单回复）
+  function inferFormStates(messages, containerEl) {
+    if (!containerEl || !window._t2aFormRenderer) return;
+    // 收集所有含 form fence 的 assistant 消息索引
+    var formMsgIndices = [];
+    for (var i = 0; i < messages.length; i++) {
+      var m = messages[i];
+      if (m.role === 'assistant' && m.content && /```form\n/.test(m.content)) {
+        formMsgIndices.push(i);
+      }
+    }
+    if (formMsgIndices.length === 0) return;
+
+    // 取容器中全部 form-block 节点（按出现顺序）
+    var allFormEls = containerEl.querySelectorAll('.form-block');
+
+    // 需要知道每个 assistant 消息里含几个 form，才能把“后续 user 状态”映射到对应的 DOM
+    // 索引起点：遍历 formMsgIndices 时记录已消费的 form DOM 个数
+    var domCursor = 0;
+    for (var k = 0; k < formMsgIndices.length; k++) {
+      var fIdx = formMsgIndices[k];
+      var content = messages[fIdx].content || '';
+      // 同一条消息里可能多个 form
+      var formCount = (content.match(/```form\n/g) || []).length;
+
+      // 看紧邻后续的第一条 user message
+      var submitted = false;
+      var hasLaterUser = false;
+      for (var j = fIdx + 1; j < messages.length; j++) {
+        if (messages[j].role === 'user') {
+          hasLaterUser = true;
+          if (messages[j].content && messages[j].content.indexOf('[表单回复]') === 0) {
+            submitted = true;
+          }
+          break;
+        }
+      }
+
+      // 对这条消息里的 formCount 个 form 应用状态
+      for (var f = 0; f < formCount; f++) {
+        var formEl = allFormEls[domCursor + f];
+        if (!formEl) continue;
+        if (submitted) {
+          window._t2aFormRenderer.markSubmitted(formEl, null);
+        } else if (hasLaterUser) {
+          // 用户绕过了表单
+          window._t2aFormRenderer.markStale(formEl);
+        }
+        // 否则最后一条不动，保持 unsubmitted
+      }
+      domCursor += formCount;
+    }
   }
 
   // ---- 欢迎页 ----
@@ -264,6 +401,7 @@
     showThinking, hideThinking,
     showMessagesLoading, hideMessagesLoading,
     renderHistory, showWelcome,
+    hydrateFormPlaceholders, getFormParsed,
     toast,
   };
 })();

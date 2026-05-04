@@ -562,6 +562,11 @@
     window._t2aSlots.on('task:cancel-request', function (data) { if (data.taskId) apiCancelTask(data.taskId); });
   }
 
+  // v0.4.0: form block 提交回写
+  if (window._t2aFormSubmit) {
+    window._t2aFormSubmit.onSubmit = function (text, formEl) { sendMessage(text); };
+  }
+
   // v0.2.0 P2: 当 ws close 4001 表示鉴权失败 → 显示登录浮层
   window.addEventListener('focus', function () {
     // 简单 hook：focus 时若未登录态则确保浮层可见

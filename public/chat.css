@@ -278,3 +278,87 @@ body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);
 .messages-loading span{font-size:13px;color:var(--color-text-tertiary)}
 .messages-loading-spinner{width:20px;height:20px;border:2px solid var(--color-border);border-top-color:var(--color-text-tertiary);border-radius:50%;animation:spin 0.7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============================================
+ * Form Block (v0.4.0)
+ * agent 嵌入式表单组件样式
+ * ============================================ */
+.form-block{width:100%;display:flex;flex-direction:column;gap:16px;margin:4px 0;padding:16px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:10px;transition:opacity var(--transition),background var(--transition)}
+.form-block .form-fields{display:flex;flex-direction:column;gap:18px}
+.form-block .form-field{display:flex;flex-direction:column;gap:8px}
+.form-block .form-field-label{font-size:13px;font-weight:500;color:var(--color-text);display:flex;align-items:center;gap:6px;line-height:1.4}
+.form-block .form-required{color:var(--color-error);font-weight:500}
+.form-block .form-hint{color:var(--color-text-tertiary);font-size:12px;font-weight:400}
+
+/* options（radio / checkbox 共用） */
+.form-block .form-options{display:flex;flex-wrap:wrap;gap:8px}
+.form-block .form-option{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text);font-size:13px;cursor:pointer;user-select:none;transition:all var(--transition);line-height:1.4}
+.form-block .form-option:hover{border-color:var(--color-border-hover);background:var(--color-bg-hover)}
+.form-block .form-option input[type="radio"],
+.form-block .form-option input[type="checkbox"]{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:14px;height:14px;margin:0;border:1.5px solid var(--color-border-hover);background:var(--color-surface);cursor:pointer;flex-shrink:0;transition:all var(--transition);position:relative}
+.form-block .form-option input[type="radio"]{border-radius:50%}
+.form-block .form-option input[type="checkbox"]{border-radius:3px}
+.form-block .form-option input[type="radio"]:checked{border-color:var(--color-accent);background:var(--color-surface)}
+.form-block .form-option input[type="radio"]:checked::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:var(--color-accent)}
+.form-block .form-option input[type="checkbox"]:checked{border-color:var(--color-accent);background:var(--color-accent)}
+.form-block .form-option input[type="checkbox"]:checked::after{content:"";position:absolute;top:1px;left:4px;width:4px;height:8px;border:solid var(--color-bg);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.form-block .form-option:has(input:checked){border-color:var(--color-accent);background:var(--color-accent-bg);color:var(--color-text)}
+
+/* text / number input */
+.form-block .form-input{width:100%;padding:9px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;font-size:13px;font-family:var(--font);color:var(--color-text);transition:border-color var(--transition),box-shadow var(--transition);line-height:1.5}
+.form-block .form-input::placeholder{color:var(--color-text-placeholder)}
+.form-block .form-input:hover{border-color:var(--color-border-hover)}
+.form-block .form-input:focus{outline:none;border-color:var(--color-border-focus);box-shadow:0 0 0 2px rgba(46,170,220,0.15)}
+
+/* textarea */
+.form-block .form-textarea{width:100%;min-height:72px;max-height:200px;padding:9px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;font-size:13px;font-family:var(--font);color:var(--color-text);resize:vertical;line-height:1.5;transition:border-color var(--transition),box-shadow var(--transition)}
+.form-block .form-textarea::placeholder{color:var(--color-text-placeholder)}
+.form-block .form-textarea:hover{border-color:var(--color-border-hover)}
+.form-block .form-textarea:focus{outline:none;border-color:var(--color-border-focus);box-shadow:0 0 0 2px rgba(46,170,220,0.15)}
+
+/* actions */
+.form-block .form-actions{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap}
+.form-block .form-submit-btn{background:var(--color-text);color:var(--color-bg);border:none;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:opacity var(--transition),background var(--transition);line-height:1.4}
+.form-block .form-submit-btn:hover{opacity:0.85}
+.form-block .form-submit-btn:active{opacity:1;background:#1f1d18}
+.form-block .form-submit-btn:disabled{opacity:0.4;cursor:not-allowed;background:var(--color-text)}
+.form-block .form-error-msg{color:var(--color-error);font-size:12px;line-height:1.5;flex:1;min-width:0}
+.form-block .form-error-msg:empty{display:none}
+
+/* submitted-tag（默认隐藏，仅在 submitted/stale 时显示） */
+.form-block .form-submitted-tag{display:none;align-items:center;gap:6px;font-size:12px;color:var(--color-text-secondary)}
+.form-block .form-submitted-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--color-success);color:var(--color-bg);font-size:10px;font-weight:600;line-height:1}
+.form-block .form-submitted-text{color:var(--color-text-secondary)}
+
+/* ===== state: unsubmitted（默认） ===== */
+.form-block[data-state="unsubmitted"] .form-submitted-tag{display:none}
+
+/* ===== state: submitted ===== */
+.form-block[data-state="submitted"]{background:var(--color-bg-secondary);opacity:0.85;border-color:var(--color-border)}
+.form-block[data-state="submitted"] .form-input,
+.form-block[data-state="submitted"] .form-textarea{background:transparent;color:var(--color-text-secondary);border-color:transparent;cursor:default;pointer-events:none}
+.form-block[data-state="submitted"] .form-option{cursor:default;pointer-events:none;color:var(--color-text-secondary)}
+.form-block[data-state="submitted"] .form-option:not(:has(input:checked)){opacity:0.5}
+.form-block[data-state="submitted"] .form-option:has(input:checked){background:var(--color-bg-tertiary);border-color:var(--color-border);color:var(--color-text-secondary)}
+.form-block[data-state="submitted"] .form-option input[type="radio"]:checked,
+.form-block[data-state="submitted"] .form-option input[type="checkbox"]:checked{border-color:var(--color-text-tertiary)}
+.form-block[data-state="submitted"] .form-option input[type="radio"]:checked::after{background:var(--color-text-tertiary)}
+.form-block[data-state="submitted"] .form-option input[type="checkbox"]:checked{background:var(--color-text-tertiary)}
+.form-block[data-state="submitted"] .form-actions{display:none}
+.form-block[data-state="submitted"] .form-submitted-tag{display:inline-flex}
+
+/* ===== state: stale（已过期）===== */
+.form-block[data-state="stale"]{background:var(--color-bg-tertiary);opacity:0.7;border-color:var(--color-border)}
+.form-block[data-state="stale"] .form-field-label,
+.form-block[data-state="stale"] .form-input,
+.form-block[data-state="stale"] .form-textarea,
+.form-block[data-state="stale"] .form-option{color:var(--color-text-tertiary)}
+.form-block[data-state="stale"] .form-input,
+.form-block[data-state="stale"] .form-textarea{background:transparent;border-color:transparent;cursor:default;pointer-events:none}
+.form-block[data-state="stale"] .form-option{cursor:default;pointer-events:none;border-color:var(--color-border)}
+.form-block[data-state="stale"] .form-option:not(:has(input:checked)){opacity:0.5}
+.form-block[data-state="stale"] .form-option:has(input:checked){background:var(--color-bg-tertiary);border-color:var(--color-border-hover)}
+.form-block[data-state="stale"] .form-actions{display:none}
+.form-block[data-state="stale"] .form-submitted-tag{display:inline-flex;color:var(--color-text-tertiary)}
+.form-block[data-state="stale"] .form-submitted-icon{background:var(--color-text-tertiary)}
+.form-block[data-state="stale"] .form-submitted-text::after{content:"（已过期）";margin-left:4px;color:var(--color-warning);font-size:11px}
