@@ -1,5 +1,21 @@
 # Changelog - t2a-chat
 
+## 0.7.0 (2026-05-06)
+
+### Features
+- Widget Mode: 嵌入式聊天气泡 SDK（`T2AWidget.init()`）
+  - 右下角浮动按钮，点击展开 400x600 聊天面板
+  - iframe 隔离，不影响宿主页面样式
+  - 支持全屏按钮（新标签页打开）
+  - 主题定制（颜色、气泡大小）
+- Widget Compact Chat：iframe 内精简聊天页
+  - 无侧边栏，最大化对话空间
+  - Session 切换下拉
+  - Task List 侧滑面板
+  - Settings 侧滑面板
+- `/widget/*` 静态路由自动挂载
+- echo-bot example 新增 widget demo 宿主页
+
 ## v0.6.1 (2026-05-05) — Open source release
 **首版开源 — npm @t2a/chat + GitHub repo**
 

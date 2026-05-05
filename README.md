@@ -303,6 +303,53 @@ auth: {
 },
 ```
 
+## Widget Mode（嵌入式聊天气泡）
+
+右下角浮动气泡，点击展开 iframe 聊天面板。适合嵌入现有系统，与宿主页面样式隔离。
+
+详细集成指南见 [WIDGET.md](./WIDGET.md)。
+
+### 快速接入
+
+```html
+<script src="https://your-host.com/chat/widget/t2a-widget.js"></script>
+<script>
+  T2AWidget.init({
+    endpoint: 'https://your-host.com/chat',
+    token: 'user-jwt-token',
+    title: 'Support',
+    theme: { primaryColor: '#4F46E5' },
+  });
+</script>
+```
+
+### 配置项
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `endpoint` | `string` | 必填 | t2a-chat 后端地址（含 basePath） |
+| `token` | `string` | 必填 | Bearer token，传入 iframe URL |
+| `position` | `'bottom-right'\|'bottom-left'` | `'bottom-right'` | 气泡位置 |
+| `theme` | `object` | `{}` | 主题配置（primaryColor, bubbleSize） |
+| `title` | `string` | `'Chat'` | 面板标题 |
+| `fullscreenUrl` | `string\|null` | `null` | 全屏按钮跳转地址 |
+
+### API 方法
+
+```js
+T2AWidget.init(config)   // 初始化
+T2AWidget.open()         // 展开面板
+T2AWidget.close()        // 收起面板
+T2AWidget.toggle()       // 切换
+T2AWidget.destroy()      // 销毁实例
+```
+
+### 后端集成
+
+无需额外配置。`createChatApp()` 自动挂载 `/widget/*` 静态路由，提供 compact chat 页面和 SDK 文件。
+
+> ⚠️ WebSocket 路径当前硬编码为 `/chat/ws`。如果 `basePath` 不是 `/chat`，需在 compact chat 页面调整 WS 地址。
+
 ## Roadmap
 
 - [ ] Tool call inspector (live tool args / results in admin)
@@ -310,6 +357,7 @@ auth: {
 - [ ] Excel attachment client-side parsing (XLSX.js)
 - [ ] WS reconnect hardening
 - [ ] React component wrapper (instead of vanilla JS frontend)
+- [ ] Widget: postMessage 通信、unread badge、basePath 参数化
 
 ## Versioning
 
