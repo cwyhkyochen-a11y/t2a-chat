@@ -123,6 +123,8 @@
       const a = document.createElement('a');
       const url = item.url || '#';
       a.href = url;
+      if (item.target) a.target = item.target;
+      if (item.target === '_blank') a.rel = 'noopener noreferrer';
       // 判断是否是当前页：同路径或 './'/'.' 与当前叠合
       let isActive = false;
       try {

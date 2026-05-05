@@ -1,5 +1,30 @@
 # Changelog - t2a-chat
 
+## v0.6.0 (2026-05-05)
+**Tools Tab + 通用 user-settings + 新标签外链**
+
+### 通用 user-settings 路由（架构下沉）
+- 新增 `src/routes-user-settings.js`：`GET/PUT /api/{basePath}/user-settings`
+- 根据 `taskRegistry.getTypeKeys()` 动态枚举，宕主不需自己实现
+- PUT 只接受已注册 taskType 的 `default_${type}_model` 键
+- 新 task type（如 audio）只要在 `taskTypes` 声明，偏好自动支持
+
+### Tools Tab
+- 新增 `src/routes-tools.js`：`GET /api/{basePath}/tools` 返回 `toolsMeta`
+- 新增 `public/tools-panel.js`：独立可挂载模块 `window._t2aToolsPanel`
+- 按 group 分组渲染 + tag pill 展示
+- toolsMeta 由宕主在 createChatApp 传入
+
+### sidebar-links 支持 target
+- `slots.js _renderSidebarLinks` 支持 `item.target`
+- `target=_blank` 自动补 `rel="noopener noreferrer"`
+
+## v0.5.0 (2026-05-05)
+**多模态附件系统**
+- attachment-manager + upload-routes + WS attachments 协议
+- chip SVG 图标 + input 对齐修复 + streaming 状态重置
+- absoluteUrl 修复（LLM 必须绝对 URL）
+
 ## v0.4.0 (2026-05-05)
 **Form Block 体系 — 结构化表单交互**
 

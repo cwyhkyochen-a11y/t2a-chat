@@ -12,6 +12,8 @@ const dbChatLLM = require('./db-chat-llm');
 const dbConfig = require('./db-config');
 const storageModule = require('./storage');
 const taskRoutes = require('./task-routes');
+const { createToolsRouter } = require('./routes-tools');
+const { createUserSettingsRouter } = require('./routes-user-settings');
 
 function checkAdminAuth(req, adminAuth) {
   if (!adminAuth) return false;
@@ -33,6 +35,7 @@ function createChatApp(options) {
     sidebarLinks = [],      // [{ url, label, icon }]
     branding = {},          // { name?, logo?, primaryColor? }
     enableFormBlocks = false, // 是否在 system prompt 注入 form 围栏使用说明
+    toolsMeta = [],         // v0.3.0: 宿主注册的 tools 元数据
   } = options;
 
   // 验证 auth 格式
@@ -87,6 +90,7 @@ function createChatApp(options) {
         chatHandler, chatRoutes, adminRoutes,
         db, dbChat, dbConfig, dbChatLLM, sessionPool, tools,
         taskRegistry, sidebarLinks, branding, loginUrl,
+        toolsMeta,
       }),
       pushToConversation,
     };
@@ -122,7 +126,12 @@ function createRequestHandler(deps) {
     chatHandler, chatRoutes, adminRoutes,
     db, dbChat, dbConfig, dbChatLLM, sessionPool, tools,
     taskRegistry, sidebarLinks, branding, loginUrl,
+    toolsMeta,
   } = deps;
+
+  // Tools 路由（独立匹配）
+  const toolsRouter = createToolsRouter(toolsMeta, basePath);
+  const userSettingsRouter = createUserSettingsRouter(basePath);
 
   // ctx 传递给各 route handler
   const ctx = {
@@ -148,8 +157,16 @@ function createRequestHandler(deps) {
       return adminRoutes.handle(req, res, ctx, adminBasePath);
     }
 
+    // Tools route（与 basePath 绑定）
+    const toolsHandled = toolsRouter(req, res);
+    if (toolsHandled) return;
+
+    // User settings route（按 taskType 动态）
+    const userSettingsHandled = await userSettingsRouter(req, res, ctx);
+    if (userSettingsHandled) return;
+
     // Task routes（与 basePath 绑定）
-    const chatPrefix = '/api/' + basePath.replace(/^\//, '');
+    const chatPrefix = '/api/' + basePath.replace(/^\//,  '');
     // 匹配 tasks / models / config/ui 相关路由
     const taskPrefixes = [chatPrefix + '/tasks', chatPrefix + '/models', chatPrefix + '/config/ui'];
     const isTaskRoute = taskPrefixes.some(p => url === p || url.startsWith(p + '/') || url.startsWith(p + '?'));
