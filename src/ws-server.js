@@ -189,7 +189,8 @@ function handleSend(ws, msg) {
   let convId = msg.conversation_id;
   const message = msg.message || '';
   const imageUrl = msg.image_url || null;
-  if (!message && !imageUrl) {
+  const attachments = msg.attachments || null; // multimodal attachments
+  if (!message && !imageUrl && (!attachments || attachments.length === 0)) {
     safeSend(ws, { type: 'error', error: 'message or image_url required' });
     return;
   }
@@ -218,10 +219,14 @@ function handleSend(ws, msg) {
 
   const session = sessionPool.getOrCreateSession(convId, ws.userId, ws._baseUrl);
 
-  // 构建 content
+  // 构建 content（多模态 attachments 优先级 > 老 image_url 逻辑）
   let content;
   const userText = message.trim();
-  if (imageUrl) {
+
+  if (attachments && attachments.length > 0) {
+    const { buildContentFromAttachments } = require('./upload-routes');
+    content = buildContentFromAttachments(userText, attachments, ws._baseUrl);
+  } else if (imageUrl) {
     const absUrl = imageUrl.startsWith('http') ? imageUrl : ws._baseUrl + imageUrl;
     const parts = [];
     if (userText) parts.push({ type: 'text', text: userText });
@@ -230,6 +235,21 @@ function handleSend(ws, msg) {
   } else {
     content = userText;
   }
+
+  // 持久化 user message 到 messages 表（含 attachments）
+  try {
+    dbChat.addMessage({
+      conversation_id: convId,
+      role: 'user',
+      content: userText,
+      attachments: attachments || null,
+    });
+  } catch (e) {
+    console.warn('[ws] save user msg to messages table failed:', e.message);
+  }
+
+  // 如果有 attachments，先存一下 JSON 以便在 sendUserMessage 之后回填到 t2a_messages
+  const attachJson = (attachments && attachments.length > 0) ? JSON.stringify(attachments) : null;
 
   // turn_start
   safeSend(ws, { type: 'turn_start' });
@@ -245,6 +265,16 @@ function handleSend(ws, msg) {
   session.sendUserMessage(content)
     .then(() => {
       clearTimeout(longWaitTimer);
+      // 回填 attachments 到 t2a_messages 的最后一条 user 记录
+      if (attachJson) {
+        try {
+          const db = ws._deps.db;
+          db.prepare(
+            `UPDATE t2a_messages SET attachments = ?
+             WHERE id = (SELECT MAX(id) FROM t2a_messages WHERE session_id = ? AND role = 'user')`
+          ).run(attachJson, String(convId));
+        } catch (e) { console.warn('[ws] update t2a_messages.attachments failed:', e.message); }
+      }
       console.log('[ws] llm_call_end', { convId, durationMs: Date.now() - t0, ok: true });
       safeSend(ws, { type: 'turn_end', conversation_id: convId });
     })

@@ -133,6 +133,12 @@ function createRequestHandler(deps) {
   return async function handleRequest(req, res) {
     const url = req.url.split('?')[0];
 
+    // 静态上传文件
+    if (url.startsWith('/uploads/') && req.method === 'GET') {
+      const uploadRoutes = require('./upload-routes');
+      return uploadRoutes.handleStaticUpload(req, res, url);
+    }
+
     // Admin API
     const adminPrefix = '/api/' + adminBasePath.replace(/^\//, '');
     if (url.startsWith(adminPrefix + '/') || url === adminPrefix) {

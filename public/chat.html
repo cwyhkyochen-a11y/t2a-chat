@@ -74,17 +74,28 @@
       <div class="input-wrap">
         <div id="commandPalette" class="cmd-palette hidden"></div>
         <div class="input-row">
-        <div id="slot-input-buttons" class="input-slot-buttons"></div>
-        <textarea id="msgInput" placeholder="Type your message..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-        <button class="stop-btn" id="stopBtn" onclick="stopStream()" style="display:none" title="Stop">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-        </button>
-        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
+        <div class="input-left">
+          <div id="slot-input-buttons" class="input-slot-buttons"></div>
+          <button class="attach-btn" id="attachBtn" title="添加附件">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="file" id="attachFileInput" multiple accept="image/*,video/*,.xlsx,.xls,.csv" hidden>
         </div>
+        <div class="input-main">
+          <div id="attachmentChips" class="attachment-chips" style="display:none"></div>
+          <textarea id="msgInput" placeholder="Type your message..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        </div>
+        <div class="input-right">
+          <button class="stop-btn" id="stopBtn" onclick="stopStream()" style="display:none" title="Stop">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        </div>
+        <div class="input-hint">Enter to send · Shift+Enter for new line · Type / for commands</div>
       </div>
-      <div class="input-hint">Enter to send · Shift+Enter for new line · Type / for commands</div>
     </div>
   </div>
 </div>
@@ -115,6 +126,7 @@
 <!-- Toast container -->
 <div class="toast-container" id="toastContainer"></div>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="ws-manager.js"></script>
 <script src="slots.js"></script>
 <script src="task-renderer.js"></script>
@@ -123,6 +135,7 @@
 <script src="form-block-parser.js"></script>
 <script src="form-renderer.js"></script>
 <script src="form-submit.js"></script>
+<script src="attachment-manager.js"></script>
 <script src="core.js"></script>
 <script src="chat.js"></script>
 </body>

@@ -172,12 +172,13 @@ class ChatWSManager {
     }
   }
 
-  send(conversationId, message, imageUrl) {
+  send(conversationId, message, attachments) {
     this._send({
       type: 'send',
       conversation_id: conversationId,
       message: message || '',
-      image_url: imageUrl || null,
+      image_url: null,
+      attachments: attachments || null,
     });
   }
 

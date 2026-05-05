@@ -297,6 +297,7 @@
   }
 
   async function selectConversation(id) {
+    setStreamingUi(false);
     const myEpoch = ++_selectEpoch;
     // 中断上一次选择的 in-flight fetch，释放浏览器 connection
     if (_selectAbortController) {
@@ -358,13 +359,18 @@
   function sendMessage(text, attachments) {
     var input = document.getElementById('msgInput');
     var message = text || input.value.trim();
-    if (!message || isStreaming) return;
+    if (!attachments && window._t2aAttachments) {
+      attachments = window._t2aAttachments.getCurrent();
+      if (attachments && attachments.length === 0) attachments = null;
+    }
+    if ((!message && !attachments) || isStreaming) return;
     if (!text) { input.value = ''; input.style.height = 'auto'; }
-    dom.appendUserBubble(message);
+    dom.appendUserBubble(message, attachments || null);
     dom.scrollToBottom();
     setStreamingUi(true);
     wsManager.send(currentConvId, message, attachments || null);
     if (window._t2aSlots) window._t2aSlots.emit('message:sent', { text: message, conversationId: currentConvId });
+    if (window._t2aAttachments) window._t2aAttachments.clear();
   }
 
   function stopStream() {
@@ -535,6 +541,9 @@
   // ---- 自动登录 + 事件绑定 ----
   // 初始化默认 slash commands
   _registerDefaultCommands();
+
+  // v0.5.0: 初始化附件管理器
+  if (window._t2aAttachments) window._t2aAttachments.init();
 
   // v0.2.0 P2: cookie-based auth，启动时直接尝试连接 WS。
   // 如果 cookie 还在 → upgrade 鉴权通过 → auth_ok；否则 401 close → 显示登录浮层。

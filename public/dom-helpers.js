@@ -132,11 +132,40 @@
   }
 
   // ---- 气泡 ----
-  function appendUserBubble(content) {
+  // 渲染附件 chip 的 HTML 字符串（用于 user message 气泡内）
+  function renderAttachments(attachments) {
+    if (!attachments) return '';
+    var list = attachments;
+    if (typeof list === 'string') {
+      try { list = JSON.parse(list); } catch (e) { return ''; }
+    }
+    if (!Array.isArray(list) || list.length === 0) return '';
+    var html = '<div class="message-attachments">';
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i] || {};
+      var url = a.url || '';
+      var name = a.filename || a.name || '';
+      var kind = a.kind || '';
+      if (kind === 'image' && url) {
+        html += '<img class="message-attachment-thumb" src="' + esc(url) + '" alt="' + esc(name) + '">';
+      } else if (kind === 'video') {
+        html += '<div class="message-attachment"><span class="message-attachment-icon">🎬</span><span class="message-attachment-name">' + esc(name) + '</span></div>';
+      } else if (kind === 'excel-text' || kind === 'excel') {
+        html += '<div class="message-attachment"><span class="message-attachment-icon">📊</span><span class="message-attachment-name">' + esc(name) + '</span></div>';
+      } else {
+        html += '<div class="message-attachment"><span class="message-attachment-icon">📎</span><span class="message-attachment-name">' + esc(name) + '</span></div>';
+      }
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function appendUserBubble(content, attachments) {
     var container = ensureContainer();
     var div = document.createElement('div');
     div.className = 'message user';
-    div.innerHTML = '<div class="avatar">' + IC_USER + '</div><div class="bubble" style="white-space:pre-wrap">' + esc(content) + '</div>';
+    var attachHtml = renderAttachments(attachments);
+    div.innerHTML = '<div class="avatar">' + IC_USER + '</div><div class="bubble" style="white-space:pre-wrap">' + attachHtml + esc(content) + '</div>';
     container.appendChild(div);
   }
 
@@ -267,7 +296,7 @@
       for (var i = 0; i < messages.length; i++) {
         var m = messages[i];
         if (m.role === 'user') {
-          appendUserBubble(m.content || '');
+          appendUserBubble(m.content || '', m.attachments);
         } else if (m.role === 'assistant') {
           if (m.content) appendAssistantBubble(m.content, { interrupted: m.interrupted });
           if (m.tool_calls) {

@@ -19,6 +19,19 @@ async function handle(req, res, ctx) {
     return chatHandler.handleChat(req, res, ctx);
   }
 
+  // 多模态附件上传
+  if (url === '/api/chat/upload-config' && method === 'GET') {
+    const uploadRoutes = require('./upload-routes');
+    return uploadRoutes.handleUploadConfig(req, res);
+  }
+  if (url === '/api/chat/upload' && method === 'POST') {
+    const { resolveUser } = ctx;
+    return resolveUser(req).then((user) => {
+      if (!user) return require('./utils').jsonRes(res, 401, { error: 'Unauthorized' });
+      return require('./upload-routes').handleUpload(req, res);
+    }).catch((err) => require('./utils').jsonRes(res, 500, { error: err.message }));
+  }
+
   // GET /api/chat/conversations
   if (url === '/api/chat/conversations' && method === 'GET') {
     return handleGetConversations(req, res, ctx);
@@ -139,7 +152,7 @@ async function handleGetConversationDetail(req, res, ctx, id) {
     const t2aRows = db.prepare(
       `SELECT id, role, content, content_type, tool_calls, tool_call_id,
               event_source, event_payload, event_default_response,
-              event_trigger_agent, interrupted, created_at
+              event_trigger_agent, interrupted, attachments, created_at
          FROM t2a_messages
         WHERE session_id = ? AND deleted_at IS NULL
         ORDER BY created_at ASC, id ASC`
@@ -155,6 +168,7 @@ async function handleGetConversationDetail(req, res, ctx, id) {
       event_source: r.event_source,
       event_payload: r.event_payload,
       interrupted: !!r.interrupted,
+      attachments: r.attachments ? JSON.parse(r.attachments) : null,
       created_at: r.created_at,
     }));
 
