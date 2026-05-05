@@ -14,6 +14,21 @@ const storageModule = require('./storage');
 const taskRoutes = require('./task-routes');
 const { createToolsRouter } = require('./routes-tools');
 const { createUserSettingsRouter } = require('./routes-user-settings');
+const path = require('path');
+const fs = require('fs');
+
+// Widget 静态文件服务
+const WIDGET_DIR = path.join(__dirname, '..', 'public', 'widget');
+const MIME_MAP = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml' };
+function serveWidgetFile(filename, res) {
+  const safeName = path.basename(filename);
+  const filePath = path.join(WIDGET_DIR, safeName);
+  if (!fs.existsSync(filePath)) { res.writeHead(404); res.end('Not found'); return; }
+  const ext = path.extname(safeName);
+  const mime = MIME_MAP[ext] || 'application/octet-stream';
+  res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' });
+  fs.createReadStream(filePath).pipe(res);
+}
 
 function checkAdminAuth(req, adminAuth) {
   if (!adminAuth) return false;
@@ -141,6 +156,14 @@ function createRequestHandler(deps) {
 
   return async function handleRequest(req, res) {
     const url = req.url.split('?')[0];
+
+    // Widget 静态文件
+    if (url === '/widget' || url === '/widget/') {
+      return serveWidgetFile('widget-chat.html', res);
+    }
+    if (url.startsWith('/widget/')) {
+      return serveWidgetFile(url.replace('/widget/', ''), res);
+    }
 
     // 静态上传文件
     if (url.startsWith('/uploads/') && req.method === 'GET') {

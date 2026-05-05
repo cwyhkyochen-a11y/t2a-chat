@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Echo Bot — Widget Demo</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 60px 24px; color: #333; }
+    h1 { font-size: 24px; margin-bottom: 12px; }
+    p { font-size: 16px; color: #666; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h1>Echo Bot — Host Application</h1>
+  <p>This is the host application. Click the bubble to open chat.</p>
+  <script src="/widget/t2a-widget.js"></script>
+  <script>
+    T2AWidget.init({ endpoint: '/widget', token: 'demo' });
+  </script>
+</body>
+</html>

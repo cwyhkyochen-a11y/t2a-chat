@@ -1,6 +1,6 @@
 {
   "name": "@t2a/chat",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Talk-to-Action Chat Runtime — the official UI/runtime layer for @t2a/core. Embeddable WebSocket chat with native interactive forms, slot system, tool rendering, and multi-modal attachments.",
   "main": "src/index.js",
   "files": [

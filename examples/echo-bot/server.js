@@ -81,8 +81,26 @@ const chat = createChatApp({
   },
 });
 
-const server = http.createServer(chat.handleRequest);
-chat.attachToServer(server);
+const server = http.createServer();
+const { handleRequest } = chat.attachToServer(server);
+
+server.on('request', async (req, res) => {
+  const handled = await handleRequest(req, res);
+  if (handled === false) {
+    // Serve static files from public/
+    const url = req.url.split('?')[0];
+    if (url === '/' || url === '/index.html') {
+      const filePath = require('path').join(__dirname, 'public', 'index.html');
+      if (require('fs').existsSync(filePath)) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        require('fs').createReadStream(filePath).pipe(res);
+        return;
+      }
+    }
+    res.writeHead(404);
+    res.end('Not found');
+  }
+});
 
 server.listen(4000, () => {
   console.log('Echo bot running → http://localhost:4000/chat');

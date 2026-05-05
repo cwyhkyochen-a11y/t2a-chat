@@ -8,7 +8,7 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "@t2a/chat": "*",
+    "@t2a/chat": "file:../..",
     "@t2a/core": "^0.6.2",
     "better-sqlite3": "^11.0.0"
   }
