@@ -1,0 +1,15 @@
+{
+  "name": "t2a-chat-echo-bot-example",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal t2a-chat host: echo bot + form block demo + system_event push",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@t2a/chat": "*",
+    "@t2a/core": "^0.6.2",
+    "better-sqlite3": "^11.0.0"
+  }
+}

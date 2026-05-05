@@ -5,3 +5,7 @@ data/
 *.db-wal
 .env
 .DS_Store
+examples/
+docs/
+TODO.md
+versions/

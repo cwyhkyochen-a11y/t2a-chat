@@ -1,8 +1,15 @@
 # Changelog - t2a-chat
 
-## v0.6.0 (2026-05-05)
-**Tools Tab + 通用 user-settings + 新标签外链**
+## v0.6.1 (2026-05-05) — Open source release
+**首版开源 — npm @t2a/chat + GitHub repo**
 
+### Repo & npm
+- 包名改为 `@t2a/chat`（scoped 公开包，配套 `@t2a/core`）
+- LICENSE (MIT)、.npmignore、repository / homepage / keywords 字段
+- `examples/echo-bot/` — 30 行 minimal host，演示 adapter / Form Block / system_event push
+- README 重写：kernel + runtime 生态叙事、Form Block hero、分层架构图、配置/API/Slot 完整文档
+
+### Tools Tab + 通用 user-settings + 新标签外链
 ### 通用 user-settings 路由（架构下沉）
 - 新增 `src/routes-user-settings.js`：`GET/PUT /api/{basePath}/user-settings`
 - 根据 `taskRegistry.getTypeKeys()` 动态枚举，宕主不需自己实现

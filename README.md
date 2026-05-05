@@ -1,110 +1,320 @@
 # t2a-chat
 
-应用层 Chat 服务 — 基于 `@t2a/core` 的完整对话系统，可嵌入任何业务后台。
+> `@t2a/chat` · **Talk-to-Action Chat Runtime** — the official UI/runtime layer for [`@t2a/core`](https://github.com/cwyhkyochen-a11y/t2a-core)
 
-## 架构
+<p align="left">
+  <a href="https://github.com/cwyhkyochen-a11y/t2a-chat/releases"><img alt="version" src="https://img.shields.io/badge/version-v0.6.1-blue"></a>
+  <a href="https://www.npmjs.com/package/@t2a/chat"><img alt="npm" src="https://img.shields.io/badge/npm-%40t2a%2Fchat-cb3837"></a>
+  <a href="./LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-green"></a>
+  <img alt="kernel" src="https://img.shields.io/badge/built%20on-%40t2a%2Fcore-blueviolet">
+</p>
+
+---
+
+## What is t2a-chat?
+
+`@t2a/core` ships the **kernel** — a TypeScript SDK that models LLM conversations as a group chat between Human, AI, and Systems.
+
+`@t2a/chat` ships the **runtime** — a drop-in WebSocket chat server + frontend that turns the kernel into something users can actually talk to.
 
 ```
-@t2a/core (SDK) → t2a-chat (应用层) → 业务系统 (imagine/job-mdm/...)
+@t2a/core  (kernel)        →  conversation engine
+   ↓
+@t2a/chat  (runtime)       →  WebSocket + HTTP + DB + frontend + admin
+   ↓
+your business app          →  write an adapter, get a chat product
 ```
 
-## 快速开始
+You write an **adapter** (auth + tools + task types). The runtime gives you:
+
+- WebSocket streaming with three-role messages (`user` / `assistant` / `system_event`)
+- Multi-conversation persistence (SQLite, swappable)
+- Tool call rendering, partial-output interruption, `/compact` command, multi-LLM fallback
+- **Native interactive forms** — the LLM emits a `[form]` block, the user fills it, the answer flows back into the conversation
+- Multi-modal attachments (images / files), drag-and-drop, paste-from-clipboard
+- A Slot system to inject your own UI (sidebar links, input buttons, welcome suggestions, config panels)
+- An admin backend for sessions, providers, overflow policy, and tool inspection
+
+## Why a runtime, not just another chat UI?
+
+Existing chat UIs (deep-chat, librechat, vercel/ai chat-ui) ship a **monolithic** experience: they own the whole stack and you bend their app to your business.
+
+`t2a-chat` flips it: **you own the business, the runtime stays out of your way.**
+
+| | t2a-chat | Typical chat UI libraries |
+|---|---|---|
+| **Mental model** | Adapter — host declares auth/tools/taskTypes, runtime wires the rest | Monolithic app — fork & customize |
+| **Backend** | Embedded in your Node app (`createChatApp` factory) | Separate service or BYO backend |
+| **Conversation engine** | `@t2a/core` (group chat with system_event role) | Plain user/assistant turns |
+| **Async system events** | First-class — tools push `system_event` after the turn ends, AI reacts without user input | None — must poll or fake another user message |
+| **Interactive forms** | **Native** — LLM emits `[form]` block, runtime renders/validates/serializes | DIY in app code |
+| **Slot system** | Inject UI in 4 mount points without forking | Fork the repo |
+| **DB** | Bring your own `better-sqlite3` instance | Hidden / proprietary |
+| **LLM fallback** | Multi-provider via `@t2a/core` | Single provider |
+| **Admin** | Built-in backend (sessions / providers / overflow / tools) | None |
+
+## ✨ Hero feature: Native Interactive Forms
+
+This is the killer.
+
+The LLM doesn't need a special "form tool". It just emits a fenced block in plain text:
+
+````
+[form]
+text(name, label="Your name", required=true)
+select(plan, label="Plan", options=["Free","Pro","Team"])
+number(seats, label="Seats", min=1, max=100)
+[/form]
+````
+
+`@t2a/chat` parses, renders, validates, and tracks the three-state lifecycle:
+
+- **unsubmitted** — interactive, user can fill
+- **submitted** — answers persist as a `[表单回复]` user message; the form snapshots
+- **stale** — when conversation context shifts, old forms grey out
+
+No tool registration. No frontend code. No prompt gymnastics. The LLM just learned a new syntax and you got a structured-data round-trip for free.
+
+This works because `@t2a/chat` injects a tiny grammar spec into the system prompt when `enableFormBlocks: true` is set, and the parser is a hand-written tokenizer (no `eval`).
+
+> **Why this matters:** every framework has tool calling. Almost none let the *AI* hand the *user* a typed UI control. This is the cleanest path from "chat" to "actionable software" we've found.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Browser                               │
+│   ┌───────────────────────────────────────────────────┐     │
+│   │  Slot system     Task renderers    Form blocks    │     │
+│   │  Multi-modal     /compact UI       Tool cards     │     │
+│   └────────────────────┬──────────────────────────────┘     │
+└────────────────────────┼────────────────────────────────────┘
+                         │ WebSocket + HTTP
+┌────────────────────────┴────────────────────────────────────┐
+│                     @t2a/chat                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ HTTP routes  │  │ WS server    │  │ Session pool     │   │
+│  │ chat-routes  │  │ ws-server    │  │ task-registry    │   │
+│  │ admin-routes │  │ form-block   │  │ upload-routes    │   │
+│  └──────────────┘  └──────┬───────┘  └──────────────────┘   │
+└────────────────────────────┼────────────────────────────────┘
+                             │
+┌────────────────────────────┴────────────────────────────────┐
+│                     @t2a/core (kernel)                      │
+│  Session · EventBus · AgentLoop · Storage · LLMClient       │
+│  Three-role messages · system_event · /compact · interrupt  │
+└─────────────────────────────────────────────────────────────┘
+                             │
+┌────────────────────────────┴────────────────────────────────┐
+│              Your business adapter (≈ 30 lines)             │
+│  auth.resolveUser   tools(ctx)   taskTypes   sidebarLinks   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Quick Start
 
 ```bash
-npm install
-# 初始化数据库（在业务系统中执行 scripts/init-schema.sql）
-npm run dev
+npm install @t2a/core @t2a/chat better-sqlite3
 ```
 
-## 接入方式
-
 ```js
-const Database = require('better-sqlite3');
 const http = require('http');
-const { createChatApp } = require('t2a-chat');
+const Database = require('better-sqlite3');
+const { ToolRegistry } = require('@t2a/core');
+const { createChatApp } = require('@t2a/chat');
 
 const db = new Database('./data/app.db');
 db.pragma('journal_mode = WAL');
 
-// 执行建表
-const fs = require('fs');
-db.exec(fs.readFileSync('./node_modules/t2a-chat/scripts/init-schema.sql', 'utf8'));
-
 const chat = createChatApp({
   db,
-  auth: (password) => password === 'demo' ? { id: 1, name: 'demo' } : null,
+
+  // Adapter: auth
+  auth: {
+    resolveUser: async (req) => {
+      const pw = req.headers['x-password'];
+      return pw === 'demo' ? { id: 1, name: 'demo' } : null;
+    },
+  },
+
+  // Adapter: admin gate
   adminAuth: (req) => req.headers.authorization === 'Bearer admin-token',
-  tools: ({ userId, conversationId, baseUrl }) => null,
+
+  // Adapter: tools (per-conversation context)
+  tools: ({ userId, conversationId, pushSystemEvent }) => {
+    const t = new ToolRegistry();
+    t.register({
+      schema: { name: 'echo', parameters: { type: 'object', properties: { text: { type: 'string' } } } },
+      handler: async ({ text }) => ({ ok: true, echo: text }),
+    });
+    return t;
+  },
+
+  // Optional: interactive forms
+  enableFormBlocks: true,
+
+  // Optional: surface task panel for the host
+  taskTypes: {
+    image: { label: 'Image generation', description: 'Render images' },
+  },
+
   basePath: '/chat',
   adminBasePath: '/chat-admin',
 });
 
 const server = http.createServer(chat.handleRequest);
 chat.attachToServer(server);
-server.listen(3000, () => console.log('Chat running on :3000'));
+server.listen(3000, () => console.log('http://localhost:3000/chat'));
 ```
 
-## API 端点
+That's the full integration. `examples/echo-bot/` is a runnable copy.
 
-### 用户侧
-- `POST /api/{basePath}` — 创建/验证对话
-- `POST /api/{basePath}/:id/interrupt` — 中断生成
-- `GET /api/{basePath}/conversations` — 对话列表
-- `POST /api/{basePath}/conversations` — 新建对话
-- `GET /api/{basePath}/conversations/:id` — 对话详情
-- `DELETE /api/{basePath}/conversations/:id` — 删除对话
-- `GET /api/{basePath}/settings` — 读取设置
-- `PUT /api/{basePath}/settings` — 更新设置
+## Slot System
 
-### 管理后台
-- `GET/PUT /api/{adminBasePath}/config` — Agent 配置
-- `GET/PUT /api/{adminBasePath}/overflow` — Overflow 配置
-- `GET/PUT /api/{adminBasePath}/settings` — 通用设置
-- `GET /api/{adminBasePath}/tools` — 工具列表
-- `GET /api/{adminBasePath}/sessions` — 会话列表
-- `GET /api/{adminBasePath}/sessions/:id` — 会话详情
-- `DELETE /api/{adminBasePath}/sessions/:id` — 删除会话
-- `CRUD /api/{adminBasePath}/llm-providers` — LLM Provider 管理
+Inject UI without forking the runtime:
+
+```js
+window.t2aChat.registerSlot('input-buttons', (ctx) => `
+  <button onclick="alert('hi')">My button</button>
+`);
+
+window.t2aChat.registerSlot('sidebar-links', () => [
+  { url: '/admin', label: 'Admin', icon: '⚙️' },
+]);
+
+window.t2aChat.registerSlot('welcome-suggestions', () => [
+  'Generate a logo', 'Summarize my notes',
+]);
+
+window.t2aChat.registerSlot('config-panels', () => /* JSX-like spec */);
+```
+
+Custom task card renderer:
+
+```js
+window.t2aChat.registerTaskRenderer('image', (task) => `
+  <div class="task-card">
+    <img src="${task.result_url}" />
+    <span>${task.status}</span>
+  </div>
+`);
+```
+
+## Capabilities
+
+- **WebSocket streaming** — token-by-token assistant output, tool start/end events, partial output preserved on interrupt
+- **Three-role messages** — `user`, `assistant`, `system_event` rendered with distinct affordances; `system_event` gets its own SVG-avatar bubble
+- **Form Block** — declarative interactive forms (text / number / select / checkbox / date) with three-state lifecycle and history replay
+- **Multi-modal attachments** — drag/drop/paste images and files; absolute URLs forwarded to the LLM; chip UI with SVG icons
+- **Slash commands** — `/compact`, `/clear`, host-extensible palette
+- **Slot system** — `input-buttons` / `sidebar-links` / `welcome-suggestions` / `config-panels`
+- **Task panel** — host-defined task types render as live status cards (cancellable; cancel emits a `system_event`)
+- **Tools tab** — host's `toolsMeta` rendered as inspectable tool list
+- **Admin backend** — sessions, LLM providers (encrypted at rest), overflow policy, `tools/*` inspection, per-user settings
+- **User settings** — `default_${taskType}_model` dynamically enumerated from `taskRegistry`; new task type = automatic preference support
+- **Multi-LLM fallback** — inherited from `@t2a/core` (timeout-based provider switching)
+- **Context compression** — `/compact` (manual) or `onOverflow: 'summarize'` (automatic), powered by `@t2a/core`'s `session.compact()`
+
+## Configuration reference
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `db` | `Database` | required | `better-sqlite3` instance |
+| `auth.resolveUser` | `(req) ⇒ user \| null` | required | Resolve user from HTTP request |
+| `auth.resolveWsUser` | `(req) ⇒ user \| null` | falls back to `resolveUser` | Resolve user from WS upgrade |
+| `auth.loginUrl` | `string` | `null` | Where the frontend redirects on 401 |
+| `adminAuth` | `(req) ⇒ boolean` | required for admin | Admin gate |
+| `tools` | `(ctx) ⇒ ToolRegistry` | required | Per-conversation tools; `ctx` includes `userId`, `conversationId`, `baseUrl`, `pushSystemEvent` |
+| `taskTypes` | `Record<string, TaskTypeDef>` | `{}` | Host-declared task types; drive the task panel and `default_${type}_model` settings |
+| `modelRouter` | `{ defaults, rules }` | `{}` | Pick model per task type / context |
+| `sidebarLinks` | `Array<{url,label,icon,target?}>` | `[]` | Top sidebar nav; `target=_blank` auto-adds `rel="noopener"` |
+| `branding` | `{name?, logo?, primaryColor?}` | `{}` | Header/branding |
+| `enableFormBlocks` | `boolean` | `false` | Inject Form Block grammar into the system prompt |
+| `toolsMeta` | `ToolMetaEntry[]` | `[]` | Surface tool list in the Tools tab |
+| `systemEventTemplate` | `(evt) ⇒ string` | built-in | Customize how `system_event` becomes a user-prefixed message at the LLM boundary |
+| `basePath` | `string` | `/chat` | HTTP/WS base path |
+| `adminBasePath` | `string` | `/chat-admin` | Admin base path |
+
+## API Endpoints
+
+### User
+- `POST /api/{basePath}` — create / verify conversation
+- `POST /api/{basePath}/:id/interrupt` — interrupt current generation
+- `GET / POST / DELETE /api/{basePath}/conversations[/...]` — conversation CRUD
+- `GET / PUT /api/{basePath}/settings` — session settings
+- `GET / PUT /api/{basePath}/user-settings` — per-user `default_${taskType}_model` (dynamic)
+- `GET /api/{basePath}/tools` — host tool metadata
+- `POST /api/{basePath}/conversations/:id/compact` — trigger `/compact`
+- `POST /api/{basePath}/upload` — multi-modal attachment upload
+
+### Admin
+- `GET / PUT /api/{adminBasePath}/config` — agent config
+- `GET / PUT /api/{adminBasePath}/overflow` — overflow policy
+- `GET / PUT /api/{adminBasePath}/settings` — global settings
+- `GET /api/{adminBasePath}/tools` — registered tools
+- `GET / DELETE /api/{adminBasePath}/sessions[/...]` — sessions inspection
+- CRUD `/api/{adminBasePath}/llm-providers` — LLM provider management (encrypted at rest)
 
 ### WebSocket
-- `ws://{host}/{basePath}/ws` — 实时对话通道
+- `ws://{host}/api/{basePath}/ws` — streaming channel; messages typed (`user_message` / `text` / `tool_start` / `tool_end` / `system_event` / `done` / ...)
 
-## Context Compression (Compact)
+## Database
 
-底层由 `@t2a/core` 的 `session.compact()` 驱动，t2a-chat 在以下时机触发：
+`@t2a/chat` ships an `init-schema.sql` (`scripts/init-schema.sql`). On first `createChatApp(...)` it runs the schema if your DB is empty. You own the file/path/journal mode.
 
-1. **用户命令** — 发送 `/compact`（可配置 `compactCommand`），Session 拦截后立即执行
-2. **自动触发** — 当 `onOverflow: 'summarize'` 配置下 context window 超限时自动压缩
+Tables created (prefix `t2a_`):
 
-### 机制
+- `t2a_messages` — three-role timeline (`deleted_at` for soft-delete after `/compact`)
+- `t2a_conversations` — user-scoped conversation list
+- `t2a_sessions` — per-conversation Session state
+- `t2a_tasks` — registered tasks (host-typed)
+- `t2a_user_settings` — `default_${taskType}_model` etc.
+- `t2a_settings` — admin-managed overflow / compact / agent config
+- `t2a_llm_providers` — encrypted provider credentials
 
+`SQLiteStorage` from `@t2a/core` is what backs the message timeline; everything else is t2a-chat owned.
+
+## Recipes
+
+### Push a system event from outside
+```js
+chat.pushSystemEvent(conversationId, {
+  source: 'webhook',
+  payload: { event: 'order.paid', orderId: '12345' },
+  triggerAgent: true,
+});
 ```
-compact({ keepLastN: 20 })
-│
-├─ 1. 加载完整历史（t2a_messages WHERE deleted_at IS NULL）
-├─ 2. 分割：前 N 条 → toCompact，后 keepLastN 条 → kept
-├─ 3. 用 LLM 把 toCompact 总结为一段摘要文本
-├─ 4. 原子操作（Storage.replaceRange）：
-│      • 旧消息打 deleted_at = now（软删除，不物理删行）
-│      • 插入 1 条 role=system_event, source='compact_summary' 摘要消息
-└─ 5. 插入 notice 消息记录本次压缩事件
+
+### Override the LLM-boundary system_event template
+```js
+createChatApp({
+  systemEventTemplate: (evt) =>
+    `[${evt.source}] ${JSON.stringify(evt.payload)}`,
+});
 ```
 
-### 对 Admin / UI 的影响
+### Cookie auth instead of header
+```js
+auth: {
+  resolveUser: async (req) => {
+    const token = parseCookie(req.headers.cookie)?.session;
+    return tokens.verify(token); // your own
+  },
+},
+```
 
-- **Sessions 列表的 message_count** = `COUNT(*) FROM t2a_messages WHERE session_id = ? AND deleted_at IS NULL`，compact 后会减少
-- **旧消息不丢失**：`deleted_at IS NOT NULL` 的行仍在数据库，可审计/恢复
-- **Admin session detail** 默认只展示活跃消息（`deleted_at IS NULL`）
+## Roadmap
 
-### 配置（通过 Admin /config 或 createChatApp options）
+- [ ] Tool call inspector (live tool args / results in admin)
+- [ ] Voice input (Whisper / 火山 ASR adapter)
+- [ ] Excel attachment client-side parsing (XLSX.js)
+- [ ] WS reconnect hardening
+- [ ] React component wrapper (instead of vanilla JS frontend)
 
-| 字段 | 默认值 | 说明 |
-|------|--------|------|
-| `overflow_strategy` | `truncate` | `truncate` / `summarize` / `reject` |
-| `context_max_tokens` | `80000` | 上下文最大 token 估算 |
-| `overflow_keep_last_n` | `20` | compact 保留最近 N 条 |
-| `overflow_warning_ratio` | `0.85` | 达到比例时 emit `overflow_warning` |
+## Versioning
+
+Major-zero series; semver follows `@t2a/core`. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).

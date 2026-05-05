@@ -1,11 +1,46 @@
 {
-  "name": "t2a-chat",
-  "version": "0.1.0",
-  "description": "应用层 Chat 服务 - 基于 @t2a/core 的完整对话系统，可嵌入任何业务后台",
+  "name": "@t2a/chat",
+  "version": "0.6.1",
+  "description": "Talk-to-Action Chat Runtime — the official UI/runtime layer for @t2a/core. Embeddable WebSocket chat with native interactive forms, slot system, tool rendering, and multi-modal attachments.",
   "main": "src/index.js",
+  "files": [
+    "src",
+    "public",
+    "scripts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "example:echo": "node examples/echo-bot/server.js"
+  },
+  "keywords": [
+    "t2a",
+    "chat",
+    "llm",
+    "agent",
+    "websocket",
+    "form-block",
+    "interactive-form",
+    "chat-ui",
+    "openai",
+    "claude",
+    "gemini",
+    "tool-calling",
+    "system-event",
+    "embeddable"
+  ],
+  "author": "kyochen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cwyhkyochen-a11y/t2a-chat.git"
+  },
+  "homepage": "https://github.com/cwyhkyochen-a11y/t2a-chat#readme",
+  "bugs": {
+    "url": "https://github.com/cwyhkyochen-a11y/t2a-chat/issues"
   },
   "dependencies": {
     "@t2a/core": "^0.6.2",
@@ -14,5 +49,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
