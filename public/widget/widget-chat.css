@@ -34,13 +34,37 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 @keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
 .msg-time { font-size: 11px; color: #9ca3af; margin-top: 2px; }
 
+/* Attachments Preview */
+.attachments-preview { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px; border-top: 1px solid #f0f0f0; background: #fafafa; flex-shrink: 0; }
+.attach-chip { display: flex; align-items: center; gap: 4px; background: #e5e7eb; padding: 4px 8px; border-radius: 6px; font-size: 12px; max-width: 180px; }
+.attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-remove { background: none; border: none; cursor: pointer; color: #666; font-size: 14px; line-height: 1; padding: 0 2px; }
+.attach-remove:hover { color: #dc2626; }
+
 /* Input */
 .input-area { display: flex; align-items: flex-end; gap: 8px; padding: 8px 12px; border-top: 1px solid #e8e8e8; background: #fff; flex-shrink: 0; }
+.attach-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.attach-btn:hover { background: #f0f0f0; color: #1a1a1a; }
 #msgInput { flex: 1; resize: none; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 14px; line-height: 1.4; max-height: 100px; overflow-y: auto; outline: none; font-family: inherit; }
 #msgInput:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
 .send-btn { background: #2563eb; border: none; color: #fff; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .send-btn:hover { background: #1d4ed8; }
 .send-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+/* Form Block */
+.msg-form { align-self: flex-start; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; max-width: 90%; width: 100%; }
+.msg-form.form-submitted { background: #f1f5f9; opacity: 0.8; }
+.form-block-title { font-weight: 600; font-size: 13px; margin-bottom: 10px; color: #334155; }
+.form-fields { display: flex; flex-direction: column; gap: 10px; }
+.form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-label { font-size: 12px; font-weight: 500; color: #475569; }
+.form-input { width: 100%; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; font-family: inherit; }
+.form-input:focus { border-color: #2563eb; }
+.form-textarea { resize: vertical; min-height: 48px; }
+.form-checkbox { width: 16px; height: 16px; cursor: pointer; }
+.form-submit-btn { margin-top: 10px; background: #2563eb; color: #fff; border: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.form-submit-btn:hover { background: #1d4ed8; }
+.form-submit-btn:disabled { background: #93c5fd; cursor: not-allowed; }
 
 /* Side Panels */
 .panel-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.3); z-index: 30; }

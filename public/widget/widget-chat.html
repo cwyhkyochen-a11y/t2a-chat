@@ -39,8 +39,15 @@
   <!-- Messages -->
   <div class="messages-area" id="messagesArea"></div>
 
+  <!-- Attachments Preview -->
+  <div class="attachments-preview hidden" id="attachmentsPreview"></div>
+
   <!-- Input -->
   <div class="input-area">
+    <button class="attach-btn" id="attachBtn" title="Attach file">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.49"/></svg>
+    </button>
+    <input type="file" id="fileInput" class="hidden" multiple accept="image/*,video/*,.pdf,.docx,.xlsx">
     <textarea id="msgInput" rows="1" placeholder="Type a message..."></textarea>
     <button class="send-btn" id="sendBtn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>

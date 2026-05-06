@@ -14,14 +14,64 @@
 - [ ] **system_event 一等公民头像**：升格为 `.message.system`，有独立 avatar（齿轮 icon）
 - [ ] **system_event 气泡样式**：独立视觉层级，不用 axis-msg
 
-## 批次 4 / v0.5.0（规划）— 模式 + 交互增强
+## 批次 4 / v0.5.0（已完成 ✅）— 模式 + 交互增强
 
-- [ ] **弹窗型 SDK 模式**：区别于当前工作台模式，支持嵌入宿主页面作为弹窗 widget 使用
-- [ ] **Tool List 展示**：工作台模式下列出当前可用的 tool 列表
-- [ ] **Task 配置面板**：工作台模式下列出 task type → model 配置映射（不同类型任务对应的模型）
+- [x] **弹窗型 SDK 模式**：v0.7.0 Widget 模式（T2AWidget.init() + iframe 隔离）
+- [x] **Tool List 展示**：v0.6.0 Tools Tab
+- [x] **Task 配置面板**：v0.6.0 Config Modal + user-settings
 - [ ] **Session 快捷回复**：session 开始前（空会话）提供快捷回复按钮，便于用户快速开始
-- [ ] **多模态发送**：user message 支持添加图片/视频/表格/doc 附件
-- [ ] **输入区对齐修复**：工作台模式下附件按钮、输入框下方文案的对齐问题
+- [x] **多模态发送**：v0.5.0 附件系统（attachment-manager + upload-routes）
+- [x] **输入区对齐修复**：v0.5.0 修复
+
+## 批次 5 — 多 Session 编排（hub-spoke）
+
+> 2026-05-06 kyo 设计讨论结论：chat 层负责 session 管理和任务编排，宿主只注册 tools + 提供 context
+
+### 架构定位
+- t2a-chat = core 的 runtime / 最佳实践
+- 三层：core(LLM通信) → chat(session管理/任务编排/调度) → 宿主(注册 tools + 业务上下文)
+- hub-spoke 先行：Main session 中心调度，子 session 不创建子 session
+
+### 设计讨论记录（2026-05-06 kyo + yoyo）
+
+**核心结论：**
+1. chat 层负责 session 管理和任务编排（不是 core，不是宿主）
+2. chat = core 的 runtime / 最佳实践，宿主只注册 tools + 提供 context
+3. hub-spoke 先行，Main session 中心调度
+
+**Agent Loop 机制：**
+- 不存在独立的"loop prompt"，驱动力是 system prompt + tool 调用结构
+- LLM 每轮二选一：输出 tool_calls（继续 loop）或纯文本（loop 结束）
+- loop 结束信号 = 本轮 LLM 响应无 tool_calls
+- Codex/Claude Code 是进程级隔离（进程退出=完成），OpenClaw 是会话级（依赖 LLM 行为）
+
+**Sub Session 用 Task 状态机管理：**
+```
+PENDING → RUNNING → COMPLETED
+                 → FAILED
+                 → TIMEOUT（兜底）
+```
+- 状态变更 = 事件推送（EventEmitter）
+- 复用 t2a-chat 现有 taskRegistry 模型，子 session = 新 task type
+- 超时只做异常兜底（设宽松值），正常路径走 complete 事件
+- 前端复用 task 卡片，状态实时更新
+
+**超时的必要性：**
+- 只防两件事：LLM 死循环 + 外部阻塞（API 挂/SSH 卡）
+- 不应该承担"完成感知"的职责
+- OpenClaw 当前问题：超时同时做异常兜底 + 正常完成感知，设短误杀、设长恢复慢
+
+**对比其他 Agent：**
+- Codex/Claude Code = fork 进程 → OS 退出信号 → 确定性完成
+- t2a-chat 目标 = 应用层模拟进程级退出语义（loop end → emit complete）
+
+### TODO
+- [ ] **SessionManager**：创建子 session、跨 session 通信、完成回调（EventEmitter）
+- [ ] **Task 状态机**：PENDING/RUNNING/COMPLETED/FAILED/TIMEOUT + 事件推送
+- [ ] **TaskPlanner / 编排逻辑**：Main LLM 决定拆不拆、怎么拆、fan-out → 等待 → 合并
+- [ ] **向后兼容**：现有单 session 模式不受影响
+- [ ] **session 生命周期**：超时只兜底异常、清理、持久化
+- [ ] **前端 task 卡片复用**：子 session 进度实时展示
 
 ## 批次 3 / v0.4.0（已完成 ✅）— 表单块 Form Block
 

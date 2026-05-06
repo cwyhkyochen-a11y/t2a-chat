@@ -33,7 +33,6 @@ function initWebSocket(server, deps) {
     const pathname = req.url ? req.url.split('?')[0] : '';
     if (pathname !== wsPath) {
       // 不是我们的 ws 路径，忽略（让其他 handler 处理）
-      socket.destroy();
       return;
     }
 

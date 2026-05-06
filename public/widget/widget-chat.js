@@ -2,13 +2,17 @@
 (function() {
   const params = new URLSearchParams(window.location.search);
   const TOKEN = params.get('token') || '';
+  const BASE_PATH = params.get('basePath') || '/chat';
   const BASE = window.location.origin;
+  const API_BASE = BASE + BASE_PATH;
   const headers = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN });
 
   let ws = null;
   let currentConvId = null;
   let conversations = [];
   let streamingEl = null;
+  let attachments = []; // [{id, filename, url}]
+  let unreadCount = 0;
 
   // DOM refs
   const convTitle = document.getElementById('convTitle');
@@ -21,6 +25,31 @@
   const panelOverlay = document.getElementById('panelOverlay');
   const taskPanel = document.getElementById('taskPanel');
   const settingsPanel = document.getElementById('settingsPanel');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+  const attachmentsPreview = document.getElementById('attachmentsPreview');
+
+  // --- postMessage helpers ---
+  function notifyParent(type, data) {
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 't2a:' + type, data: data }, '*');
+    }
+  }
+
+  function notifyUnread() {
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 't2a:unread', count: unreadCount }, '*');
+    }
+  }
+
+  // Listen for messages from parent
+  window.addEventListener('message', function(ev) {
+    if (!ev.data || typeof ev.data.type !== 'string') return;
+    if (ev.data.type === 't2a:panel_opened') {
+      unreadCount = 0;
+      notifyUnread();
+    }
+  });
 
   // --- Init ---
   async function init() {
@@ -29,12 +58,13 @@
     if (conversations.length > 0) { await switchConv(conversations[0].id); }
     else { await createConv(); }
     connectWS();
+    notifyParent('ready');
   }
 
   // --- Conversations ---
   async function loadConversations() {
     try {
-      const res = await fetch(BASE + '/api/chat/conversations', { headers: headers() });
+      const res = await fetch(API_BASE + '/api/conversations', { headers: headers() });
       conversations = await res.json();
     } catch(e) { conversations = []; }
   }
@@ -55,7 +85,7 @@
     messagesArea.innerHTML = '';
     streamingEl = null;
     try {
-      const res = await fetch(BASE + '/api/chat/conversations/' + id, { headers: headers() });
+      const res = await fetch(API_BASE + '/api/conversations/' + id, { headers: headers() });
       const data = await res.json();
       if (data.messages) data.messages.forEach(m => renderMessage(m));
       scrollBottom();
@@ -64,7 +94,7 @@
 
   async function createConv() {
     try {
-      const res = await fetch(BASE + '/api/chat/conversations', { method: 'POST', headers: headers(), body: JSON.stringify({ title: 'New Chat' }) });
+      const res = await fetch(API_BASE + '/api/conversations', { method: 'POST', headers: headers(), body: JSON.stringify({ title: 'New Chat' }) });
       const data = await res.json();
       await loadConversations();
       await switchConv(data.id);
@@ -83,7 +113,7 @@
   // --- WebSocket ---
   function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(proto + '//' + location.host + '/chat/ws?token=' + TOKEN);
+    ws = new WebSocket(proto + '//' + location.host + BASE_PATH + '/ws?token=' + TOKEN);
     ws.onmessage = (ev) => {
       try { handleWsMsg(JSON.parse(ev.data)); } catch(e) {}
     };
@@ -98,26 +128,149 @@
       case 'tool_call': renderToolCall(msg); break;
       case 'tool_result': renderToolResult(msg); break;
       case 'system_event': renderSystemEvent(msg); break;
+      case 'form_block': renderFormBlock(msg); break;
       case 'error': renderSystemMsg('Error: ' + (msg.error || msg.message || 'Unknown')); break;
+    }
+    // Notify parent of new assistant messages
+    if (msg.type === 'message_done' || msg.type === 'chunk') {
+      unreadCount++;
+      notifyUnread();
+      if (msg.type === 'message_done') {
+        notifyParent('message', { role: 'assistant', content: msg.content || '' });
+      }
     }
   }
 
   // --- Send ---
   function sendMessage() {
     const text = msgInput.value.trim();
-    if (!text || !currentConvId) return;
+    if (!text && attachments.length === 0) return;
+    if (!currentConvId) return;
     msgInput.value = '';
     autoResize();
     renderMessage({ role: 'user', content: text });
+    notifyParent('message', { role: 'user', content: text });
     scrollBottom();
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'chat', conversation_id: currentConvId, content: text }));
+      const payload = { type: 'chat', conversation_id: currentConvId, content: text };
+      if (attachments.length > 0) {
+        payload.attachments = attachments.map(a => ({ id: a.id, filename: a.filename, url: a.url }));
+      }
+      ws.send(JSON.stringify(payload));
     }
+    clearAttachments();
   }
   sendBtn.onclick = sendMessage;
   msgInput.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
   msgInput.oninput = autoResize;
   function autoResize() { msgInput.style.height = 'auto'; msgInput.style.height = Math.min(msgInput.scrollHeight, 100) + 'px'; }
+
+  // --- Attachments ---
+  attachBtn.onclick = () => fileInput.click();
+  fileInput.onchange = async () => {
+    const files = fileInput.files;
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      await uploadFile(files[i]);
+    }
+    fileInput.value = '';
+  };
+
+  async function uploadFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(API_BASE + '/api/uploads', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + TOKEN },
+        body: formData,
+      });
+      const data = await res.json();
+      attachments.push({ id: data.id, filename: data.filename || file.name, url: data.url });
+      renderAttachments();
+    } catch(e) {
+      console.error('Upload failed:', e);
+    }
+  }
+
+  function renderAttachments() {
+    if (attachments.length === 0) {
+      attachmentsPreview.classList.add('hidden');
+      attachmentsPreview.innerHTML = '';
+      return;
+    }
+    attachmentsPreview.classList.remove('hidden');
+    attachmentsPreview.innerHTML = attachments.map((a, i) =>
+      `<div class="attach-chip"><span class="attach-name">${esc(a.filename)}</span><button class="attach-remove" data-idx="${i}">&times;</button></div>`
+    ).join('');
+    attachmentsPreview.querySelectorAll('.attach-remove').forEach(btn => {
+      btn.onclick = () => { attachments.splice(Number(btn.dataset.idx), 1); renderAttachments(); };
+    });
+  }
+
+  function clearAttachments() {
+    attachments = [];
+    renderAttachments();
+  }
+
+  // --- Form Block ---
+  function renderFormBlock(msg) {
+    const formId = msg.form_id || ('form-' + Date.now());
+    const fields = msg.fields || [];
+    const el = document.createElement('div');
+    el.className = 'msg msg-form';
+    el.id = 'form-' + formId;
+    let html = '<div class="form-block-title">' + esc(msg.title || 'Form') + '</div>';
+    html += '<div class="form-fields">';
+    fields.forEach(f => {
+      html += '<div class="form-field">';
+      html += '<label class="form-label">' + esc(f.label || f.name) + '</label>';
+      switch(f.type) {
+        case 'select':
+          html += '<select class="form-input" data-name="' + esc(f.name) + '">';
+          (f.options || []).forEach(o => { html += '<option value="' + esc(o.value || o) + '">' + esc(o.label || o) + '</option>'; });
+          html += '</select>';
+          break;
+        case 'checkbox':
+          html += '<input type="checkbox" class="form-checkbox" data-name="' + esc(f.name) + '">';
+          break;
+        case 'textarea':
+          html += '<textarea class="form-input form-textarea" data-name="' + esc(f.name) + '" rows="3"></textarea>';
+          break;
+        case 'number':
+          html += '<input type="number" class="form-input" data-name="' + esc(f.name) + '">';
+          break;
+        default:
+          html += '<input type="text" class="form-input" data-name="' + esc(f.name) + '">';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<button class="form-submit-btn" data-form-id="' + esc(formId) + '">Submit</button>';
+    el.innerHTML = html;
+    messagesArea.appendChild(el);
+    scrollBottom();
+    // Bind submit
+    el.querySelector('.form-submit-btn').onclick = function() { submitForm(el, formId, fields); };
+  }
+
+  function submitForm(el, formId, fields) {
+    const data = {};
+    fields.forEach(f => {
+      const input = el.querySelector('[data-name="' + f.name + '"]');
+      if (!input) return;
+      if (f.type === 'checkbox') { data[f.name] = input.checked; }
+      else { data[f.name] = input.value; }
+    });
+    // Send via WS
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'form_submit', conversation_id: currentConvId, form_id: formId, data: data }));
+    }
+    // Disable form
+    el.querySelectorAll('input, select, textarea, button').forEach(inp => { inp.disabled = true; });
+    el.classList.add('form-submitted');
+    notifyParent('form_submitted', { form_id: formId, values: data });
+  }
 
   // --- Render ---
   function renderMessage(m) {
@@ -190,7 +343,7 @@
   async function loadTasks() {
     const body = document.getElementById('taskPanelBody');
     try {
-      const res = await fetch(BASE + '/api/chat/tasks', { headers: headers() });
+      const res = await fetch(API_BASE + '/api/tasks', { headers: headers() });
       const tasks = await res.json();
       if (!tasks.length) { body.innerHTML = '<div class="empty-state">No tasks</div>'; return; }
       body.innerHTML = tasks.map(t => `<div class="task-item"><div class="task-title">${esc(t.title || t.type || 'Task')}</div><div class="task-status task-status-${t.status || 'pending'}">${t.status || 'pending'}</div></div>`).join('');
@@ -201,7 +354,7 @@
   async function loadSettings() {
     const body = document.getElementById('settingsPanelBody');
     try {
-      const res = await fetch(BASE + '/api/chat/settings', { headers: headers() });
+      const res = await fetch(API_BASE + '/api/settings', { headers: headers() });
       const settings = await res.json();
       const model = settings.default_model || '';
       body.innerHTML = `<div class="setting-group"><div class="setting-label">Default Model</div><input class="setting-input" id="settingModel" value="${esc(model)}"></div><button class="setting-save-btn" id="saveSettingsBtn">Save</button>`;
@@ -212,7 +365,7 @@
   async function saveSettings() {
     const model = document.getElementById('settingModel')?.value || '';
     try {
-      await fetch(BASE + '/api/chat/settings', { method: 'PUT', headers: headers(), body: JSON.stringify({ default_model: model }) });
+      await fetch(API_BASE + '/api/settings', { method: 'PUT', headers: headers(), body: JSON.stringify({ default_model: model }) });
     } catch(e) {}
   }
 

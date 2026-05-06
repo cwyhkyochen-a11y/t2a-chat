@@ -9,13 +9,17 @@
   var isOpen = false;
   var container = null;
   var bubble = null;
+  var badge = null;
   var panel = null;
   var iframe = null;
+  var unreadCount = 0;
+  var listeners = {};
 
   // 默认配置
   var defaults = {
     endpoint: '',
     token: '',
+    basePath: '/chat',
     position: 'bottom-right',
     theme: {
       primaryColor: '#0066ff',
@@ -37,6 +41,7 @@
       url += (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(config.token);
     }
     url += (url.indexOf('?') === -1 ? '?' : '&') + 'mode=widget';
+    url += '&basePath=' + encodeURIComponent(config.basePath);
     return url;
   }
 
@@ -61,6 +66,11 @@
     bubble.innerHTML = ICON_CHAT;
     bubble.setAttribute('aria-label', 'Open chat');
     bubble.addEventListener('click', toggle);
+
+    // Unread badge
+    badge = document.createElement('span');
+    badge.className = 't2a-badge t2a-badge-hidden';
+    bubble.appendChild(badge);
 
     // 面板
     panel = document.createElement('div');
@@ -139,6 +149,64 @@
     document.head.appendChild(link);
   }
 
+  // postMessage 监听
+  function setupPostMessage() {
+    window.addEventListener('message', function (ev) {
+      if (!ev.data || typeof ev.data.type !== 'string') return;
+      if (ev.data.type.indexOf('t2a:') !== 0) return;
+
+      var eventName = ev.data.type.replace('t2a:', '');
+
+      // Unread badge 处理
+      if (eventName === 'unread') {
+        if (!isOpen) {
+          unreadCount = ev.data.count || 0;
+          updateBadge();
+        }
+      }
+
+      // 触发注册的回调
+      emit(eventName, ev.data.data || ev.data);
+    });
+  }
+
+  // 事件系统
+  function on(event, callback) {
+    if (!listeners[event]) listeners[event] = [];
+    listeners[event].push(callback);
+  }
+
+  function off(event, callback) {
+    if (!listeners[event]) return;
+    if (!callback) { listeners[event] = []; return; }
+    listeners[event] = listeners[event].filter(function (fn) { return fn !== callback; });
+  }
+
+  function emit(event, data) {
+    if (!listeners[event]) return;
+    listeners[event].forEach(function (fn) {
+      try { fn(data); } catch (e) { console.error('[T2AWidget] listener error:', e); }
+    });
+  }
+
+  // 向 iframe 发送消息
+  function send(message) {
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(message, '*');
+    }
+  }
+
+  // Badge
+  function updateBadge() {
+    if (unreadCount <= 0) {
+      badge.classList.add('t2a-badge-hidden');
+      badge.textContent = '';
+    } else {
+      badge.classList.remove('t2a-badge-hidden');
+      badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+    }
+  }
+
   // 打开面板
   function open() {
     if (isOpen) return;
@@ -149,6 +217,11 @@
     }
     panel.classList.add('t2a-panel-open');
     bubble.classList.add('t2a-bubble-hidden');
+    // 清零未读
+    unreadCount = 0;
+    updateBadge();
+    // 通知 iframe 面板已打开
+    send({ type: 't2a:panel_opened' });
   }
 
   // 关闭面板
@@ -175,10 +248,13 @@
     }
     container = null;
     bubble = null;
+    badge = null;
     panel = null;
     iframe = null;
     config = null;
     isOpen = false;
+    unreadCount = 0;
+    listeners = {};
   }
 
   // 初始化
@@ -203,6 +279,7 @@
 
     ensureCSS();
     createDOM();
+    setupPostMessage();
 
     // 应用主题色到气泡
     if (config.theme.primaryColor && config.theme.primaryColor !== '#0066ff') {
@@ -217,5 +294,8 @@
     close: close,
     toggle: toggle,
     destroy: destroy,
+    on: on,
+    off: off,
+    send: send,
   };
 })();
