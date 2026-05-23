@@ -37,7 +37,14 @@
     finalizeSegment() {
       if (!this.streamDiv) return;
       const t = this.streamDiv.querySelector('.stream-text');
-      if (t) { t.classList.add('done'); if (!this.content) this.streamDiv.remove(); }
+      if (t) {
+        t.classList.add('done');
+        if (!this.content) {
+          this.streamDiv.remove();
+        } else {
+          dom.hydrateFormPlaceholders(this.streamDiv);
+        }
+      }
       this.streamDiv = null;
       this.content = '';
       this._thinkingDetails = null;
